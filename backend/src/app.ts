@@ -6,6 +6,8 @@ import jwt from '@fastify/jwt';
 import dotenv from 'dotenv';
 import { authRoutes } from './routes/auth';
 import { eventRoutes } from './routes/events';
+import { productRoutes } from './routes/products';
+import { postRoutes } from './routes/posts';
 
 dotenv.config();
 
@@ -53,6 +55,12 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // Event Routes
   await app.register(eventRoutes, { prefix: '/api/v1/events' });
+
+  // Product Routes
+  await app.register(productRoutes, { prefix: '/api/v1/products' });
+
+  // Post Routes
+  await app.register(postRoutes, { prefix: '/api/v1/posts' });
 
   return app;
 }
