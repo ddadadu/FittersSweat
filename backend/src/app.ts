@@ -2,7 +2,9 @@ import Fastify, { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
+import jwt from '@fastify/jwt';
 import dotenv from 'dotenv';
+import { authRoutes } from './routes/auth';
 
 dotenv.config();
 
@@ -31,6 +33,11 @@ export async function buildApp(): Promise<FastifyInstance> {
     routePrefix: '/docs',
   });
 
+  // JWT
+  await app.register(jwt, {
+    secret: process.env.JWT_SECRET || 'fallback-secret-for-development-32chars',
+  });
+
   // Health check
   app.get('/health', async () => {
     return {
@@ -39,6 +46,9 @@ export async function buildApp(): Promise<FastifyInstance> {
       database: 'connected',
     };
   });
+
+  // Auth Routes
+  await app.register(authRoutes, { prefix: '/api/v1/auth' });
 
   return app;
 }
