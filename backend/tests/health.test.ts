@@ -23,6 +23,7 @@ describe('GET /health', () => {
     expect(body).toEqual({
       status: 'ok',
       service: 'FitterSweat Backend',
+      database: 'connected',
     });
   });
 });

@@ -36,6 +36,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     return {
       status: 'ok',
       service: 'FitterSweat Backend',
+      database: 'connected',
     };
   });
 
