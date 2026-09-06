@@ -5,6 +5,7 @@ import swaggerUi from '@fastify/swagger-ui';
 import jwt from '@fastify/jwt';
 import dotenv from 'dotenv';
 import { authRoutes } from './routes/auth';
+import { eventRoutes } from './routes/events';
 
 dotenv.config();
 
@@ -49,6 +50,9 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // Auth Routes
   await app.register(authRoutes, { prefix: '/api/v1/auth' });
+
+  // Event Routes
+  await app.register(eventRoutes, { prefix: '/api/v1/events' });
 
   return app;
 }
