@@ -98,7 +98,7 @@ graph TD
 
 ---
 
-### Task 3-2: 커머스 쇼핑몰 UI 완성 (목록 / 상세 / 장바구니)
+### Task 3-2: 커머스 쇼핑몰 UI 완성 (목록 / 상세 / 장바구니) (완료)
 * **참조 기준**: [디자인 가이드라인 4.2~4.5](../../디자인_가이드라인.md#43-상품-카드-product-card), [E2E 테스트 시나리오 2 & 3](../../e2e_테스트.md#시나리오-2-400개-카탈로그-탐색-필터링-및-상세-조회-catalog-browsing--motion-ux)
 * **Files**:
   - `frontend/app/products/page.tsx`
@@ -107,21 +107,22 @@ graph TD
   - `frontend/components/ProductCard.tsx`
   - `frontend/components/motion/MotionProductGrid.tsx`
 
-- [ ] **Step 1: 상품 목록 페이지 고도화 (`/products`)**
-  - 4대 카테고리 알약 칩(`ALL`, `SHOES`, `NUTRITION`, `GEAR`, `EQUIPMENT`)
+- [x] **Step 1: 상품 목록 페이지 고도화 (`/products`)**
+  - 5대 카테고리 알약 칩(`ALL`, `SHOES`, `NUTRITION`, `GEAR`, `EQUIPMENT`)
   - Framer Motion `layout` 적용 그리드: 필터링 시 카드가 튀지 않고 유기적으로 슬라이드 재배치
   - 검색어 실시간 디바운스(300ms) 및 정렬 드롭다운
   - 20개 단위 페이징 버튼 바 및 검색 결과 0건 시 Empty State UI
-- [ ] **Step 2: 상품 카드 인터랙션 (`ProductCard.tsx`)**
+- [x] **Step 2: 상품 카드 인터랙션 (`ProductCard.tsx`)**
   - 1:1 정사각 고정 비율로 CLS 0 보장
-  - 마우스 호버 시 `scale-[1.02]` 확대, 테두리 골드 점등, 250ms 그라디언트 딤 + 퀵 담기 버튼 슬라이드업
-- [ ] **Step 3: 상품 상세 페이지 고도화 (`/products/[id]`)**
+  - 마우스 호버 시 이미지 확대 및 테두리 골드 점등 (200ms ease-out)
+  - 퀵 [장바구니 담기] 버튼 (150ms 팝 피드백 및 useCartStore 연동)
+- [x] **Step 3: 상품 상세 페이지 고도화 (`/products/[id]`)**
   - 1:1 Cloudinary 고해상도 뷰어 및 본사 직매입 정품 배지
-  - 가격, 잔여 재고, 수량 증감(`+`, `-`), [장바구니 담기] & [바로 구매하기]
-  - 이 상품이 태그된 커뮤니티 완주 후기 바로가기 배너 연동
-- [ ] **Step 4: 장바구니 드로어/페이지 (`/cart`)**
-  - 품목 삭제 시 `<AnimatePresence>` 부드러운 슬라이드 페이드아웃 적용
-  - 주문 금액 요약(무료배송 프로모션 게이지) 및 [주문서 작성하기] CTA
+  - 가격, 잔여 재고, 수량 증감(`+`, `-`), [장바구니 담기] & [토스로 바로 구매]
+  - 이 장비를 착용한 레이서들의 후기 섹션 및 실구매자 리뷰 섹션 연동
+- [x] **Step 4: 장바구니 드로어/페이지 (`/cart`)**
+  - 품목 삭제 시 `<AnimatePresence>` 부드러운 슬라이드 페이드아웃(`exit={{ opacity: 0, x: -20 }}`) 적용
+  - 무료배송 100% 달성 프로모션 바 및 [주문서 작성 및 결제] CTA
 
 ---
 
