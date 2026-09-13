@@ -16,13 +16,16 @@ export async function postRoutes(app: FastifyInstance) {
         user: {
           select: { id: true, name: true },
         },
+        event: {
+          select: { id: true, name: true, cityCode: true },
+        },
         _count: {
           select: { postComments: true },
         },
         taggedItems: {
           include: {
             product: {
-              select: { id: true, name: true, price: true, categoryId: true },
+              select: { id: true, name: true, price: true, categoryId: true, imageUrl: true },
             },
           },
         },
@@ -36,6 +39,10 @@ export async function postRoutes(app: FastifyInstance) {
         id: p.id.toString(),
         userId: p.userId.toString(),
         eventId: p.eventId?.toString() || null,
+        event: p.event ? {
+          ...p.event,
+          id: p.event.id.toString(),
+        } : null,
         user: {
           id: p.user.id.toString(),
           name: p.user.name,
@@ -47,6 +54,7 @@ export async function postRoutes(app: FastifyInstance) {
             ...ti.product,
             id: ti.product.id.toString(),
             price: Number(ti.product.price),
+            imageUrl: ti.product.imageUrl || null,
           },
         })),
       })),
@@ -64,6 +72,9 @@ export async function postRoutes(app: FastifyInstance) {
           user: {
             select: { id: true, name: true },
           },
+          event: {
+            select: { id: true, name: true, cityCode: true },
+          },
           postComments: {
             include: {
               user: {
@@ -75,7 +86,7 @@ export async function postRoutes(app: FastifyInstance) {
           taggedItems: {
             include: {
               product: {
-                select: { id: true, name: true, price: true, categoryId: true },
+                select: { id: true, name: true, price: true, categoryId: true, imageUrl: true },
               },
             },
           },
@@ -93,6 +104,10 @@ export async function postRoutes(app: FastifyInstance) {
           id: post.id.toString(),
           userId: post.userId.toString(),
           eventId: post.eventId?.toString() || null,
+          event: post.event ? {
+            ...post.event,
+            id: post.event.id.toString(),
+          } : null,
           user: {
             id: post.user.id.toString(),
             name: post.user.name,
@@ -113,6 +128,7 @@ export async function postRoutes(app: FastifyInstance) {
               ...ti.product,
               id: ti.product.id.toString(),
               price: Number(ti.product.price),
+              imageUrl: ti.product.imageUrl || null,
             },
           })),
         },

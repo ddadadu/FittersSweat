@@ -23,3 +23,23 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
 
   return data as T;
 }
+
+export async function ensureAuthToken(): Promise<string | null> {
+  if (typeof window === 'undefined') return null;
+  const existing = localStorage.getItem('accessToken');
+  if (existing) return existing;
+
+  try {
+    const res = await fetchApi<{ accessToken: string }>('/api/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email: 'runner1@naver.com', password: 'password123' }),
+    });
+    if (res.accessToken) {
+      localStorage.setItem('accessToken', res.accessToken);
+      return res.accessToken;
+    }
+  } catch (err) {
+    console.warn('Auto-login test account failed:', err);
+  }
+  return null;
+}

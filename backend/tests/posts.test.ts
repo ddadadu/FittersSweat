@@ -125,4 +125,16 @@ describe('Community Posts API (/api/v1/posts)', () => {
     expect(body.comment).toHaveProperty('id');
     expect(body.comment.content).toBe('정말 유익한 정보네요! 저도 이번에 그 신발 신어봐야겠습니다.');
   });
+
+  it('GET /api/v1/posts?eventId=99999 - should filter posts by event ID', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/posts?eventId=9999999999',
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.payload);
+    expect(body.success).toBe(true);
+    expect(body.posts.length).toBe(0);
+  });
 });
