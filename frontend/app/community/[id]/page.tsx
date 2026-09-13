@@ -365,6 +365,8 @@ export default function PostDetailPage() {
           {/* Comment Creation Form */}
           <form onSubmit={handleCommentSubmit} className="space-y-3">
             <textarea
+              id="comment-input"
+              aria-label="응원 댓글 입력"
               value={newComment}
               onChange={(e) => {
                 setNewComment(e.target.value);

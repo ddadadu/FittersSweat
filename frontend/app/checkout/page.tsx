@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { loadTossPayments, ANONYMOUS, TossPaymentsWidgets } from '@tosspayments/tosspayments-sdk';
 import { useCartStore } from '@/stores/useCartStore';
-import { fetchApi } from '@/lib/api';
+import { fetchApi, ensureAuthToken } from '@/lib/api';
 import {
   ShoppingBag,
   ArrowRight,
@@ -20,6 +20,7 @@ import {
   Sparkles,
   Lock,
   ChevronLeft,
+  Check,
 } from 'lucide-react';
 
 interface OrderFormState {
@@ -52,6 +53,8 @@ export default function CheckoutPage() {
     deliveryRequest: '',
   });
 
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [sameAsOrderer, setSameAsOrderer] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isWidgetLoading, setIsWidgetLoading] = useState(true);
@@ -60,31 +63,12 @@ export default function CheckoutPage() {
   const widgetsRef = useRef<TossPaymentsWidgets | null>(null);
   const totalAmount = getTotalAmount();
 
-  // 1. Mount & Auth Guard: Ensure token exists; auto-login runner1@naver.com if missing
+  // 1. Mount & Auth Guard: Ensure valid token exists; auto-refresh if expired
   useEffect(() => {
     setMounted(true);
-
-    async function checkAndEnsureAuth() {
-      try {
-        const token = localStorage.getItem('accessToken');
-        if (!token) {
-          const res = await fetchApi<{ accessToken: string }>('/api/v1/auth/login', {
-            method: 'POST',
-            body: JSON.stringify({
-              email: 'runner1@naver.com',
-              password: 'password123',
-            }),
-          });
-          if (res.accessToken) {
-            localStorage.setItem('accessToken', res.accessToken);
-          }
-        }
-      } catch (err) {
-        console.error('Auto login for checkout failed:', err);
-      }
-    }
-
-    checkAndEnsureAuth();
+    ensureAuthToken().catch((err) =>
+      console.warn('Auto auth validation notice:', err)
+    );
 
     return () => {
       widgetsRef.current = null;
@@ -126,6 +110,10 @@ export default function CheckoutPage() {
           value: totalAmount,
         });
 
+        // Prevent duplicate widget iframe containers
+        document.querySelector('#payment-method')?.replaceChildren();
+        document.querySelector('#agreement')?.replaceChildren();
+
         await Promise.all([
           widgets.renderPaymentMethods({
             selector: '#payment-method',
@@ -163,61 +151,105 @@ export default function CheckoutPage() {
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    setForm((prev) => {
+      const next = { ...prev, [name]: value };
+      if (sameAsOrderer) {
+        if (name === 'ordererName') next.recipientName = value;
+        if (name === 'ordererPhone') next.recipientPhone = value;
+      }
+      return next;
+    });
+
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
+    }
+  };
+
+  const handleSameAsOrdererChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const checked = e.target.checked;
+    setSameAsOrderer(checked);
+    if (checked) {
+      setForm((prev) => ({
+        ...prev,
+        recipientName: prev.ordererName,
+        recipientPhone: prev.ordererPhone,
+      }));
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next.recipientName;
+        delete next.recipientPhone;
+        return next;
+      });
+    }
   };
 
   // Form Validation and Order Creation
   const validateAndCreateOrder = async (): Promise<string | null> => {
+    const errors: Record<string, string> = {};
+    const phoneRegex = /^01[016789]-?\d{3,4}-?\d{4}$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
     if (!form.ordererName.trim()) {
-      setErrorMessage('주문자 이름을 입력해 주세요.');
-      return null;
+      errors.ordererName = '주문자 성명을 입력해 주세요.';
     }
     if (!form.ordererPhone.trim()) {
-      setErrorMessage('주문자 연락처를 입력해 주세요.');
-      return null;
+      errors.ordererPhone = '주문자 연락처를 입력해 주세요.';
+    } else if (!phoneRegex.test(form.ordererPhone.trim())) {
+      errors.ordererPhone = '올바른 휴대폰 번호를 입력해 주세요 (예: 010-1234-5678).';
     }
     if (!form.ordererEmail.trim()) {
-      setErrorMessage('주문자 이메일을 입력해 주세요.');
-      return null;
-    }
-
-    // Review Finding #9: Basic email format validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(form.ordererEmail.trim())) {
-      setErrorMessage('올바른 이메일 형식을 입력해 주세요 (예: runner1@naver.com).');
-      return null;
+      errors.ordererEmail = '주문자 이메일을 입력해 주세요.';
+    } else if (!emailRegex.test(form.ordererEmail.trim())) {
+      errors.ordererEmail = '올바른 이메일 형식을 입력해 주세요 (예: runner@example.com).';
     }
 
     if (!form.recipientName.trim()) {
-      setErrorMessage('수령인 이름을 입력해 주세요.');
-      return null;
+      errors.recipientName = '수령인 성명을 입력해 주세요.';
     }
     if (!form.recipientPhone.trim()) {
-      setErrorMessage('수령인 연락처를 입력해 주세요.');
-      return null;
+      errors.recipientPhone = '수령인 연락처를 입력해 주세요.';
+    } else if (!phoneRegex.test(form.recipientPhone.trim())) {
+      errors.recipientPhone = '올바른 수령인 연락처를 입력해 주세요 (예: 010-1234-5678).';
     }
+
     if (!form.shippingAddress.trim()) {
-      setErrorMessage('배송지 주소를 입력해 주세요.');
+      errors.shippingAddress = '배송지 기본 주소를 입력해 주세요.';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      const firstKey = Object.keys(errors)[0];
+      const firstMsg = errors[firstKey];
+      setErrorMessage(firstMsg);
+
+      if (typeof document !== 'undefined') {
+        const el = document.getElementById(firstKey);
+        if (el) {
+          el.focus();
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      }
       return null;
     }
 
-    // Ensure token is present before order creation
-    const token = localStorage.getItem('accessToken');
+    setFieldErrors({});
+
+    // Ensure valid active JWT token exists via ensureAuthToken (auto-renews if expired)
+    const token = await ensureAuthToken();
     if (!token) {
-      try {
-        const loginRes = await fetchApi<{ accessToken: string }>('/api/v1/auth/login', {
-          method: 'POST',
-          body: JSON.stringify({
-            email: 'runner1@naver.com',
-            password: 'password123',
-          }),
-        });
-        if (loginRes.accessToken) {
-          localStorage.setItem('accessToken', loginRes.accessToken);
-        }
-      } catch (e) {
-        console.error('Failed to renew token:', e);
+      setErrorMessage('로그인 세션 인증에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+      if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
+      return null;
     }
 
     try {
@@ -244,6 +276,9 @@ export default function CheckoutPage() {
     } catch (err: any) {
       const msg = err.message || '주문 생성 중 오류가 발생했습니다.';
       setErrorMessage(msg);
+      if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
       return null;
     }
   };
@@ -395,7 +430,7 @@ export default function CheckoutPage() {
           <div className="flex items-center space-x-2">
             <Link
               href="/cart"
-              className="inline-flex items-center text-xs font-semibold text-neutral-400 hover:text-white transition-colors"
+              className="inline-flex items-center text-xs font-semibold text-neutral-400 hover:text-white transition-colors py-1.5"
             >
               <ChevronLeft className="w-4 h-4 mr-0.5" />
               장바구니로 돌아가기
@@ -455,8 +490,18 @@ export default function CheckoutPage() {
                   value={form.ordererName}
                   onChange={handleInputChange}
                   placeholder="성명 입력 (예: 홍길동)"
-                  className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#FFD700] transition-colors"
+                  className={`w-full bg-neutral-900 border rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none transition-colors ${
+                    fieldErrors.ordererName
+                      ? 'border-rose-500 focus:border-rose-500 ring-1 ring-rose-500'
+                      : 'border-neutral-700 focus:border-[#FFD700]'
+                  }`}
                 />
+                {fieldErrors.ordererName && (
+                  <p className="text-xs text-rose-400 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    <span>{fieldErrors.ordererName}</span>
+                  </p>
+                )}
               </div>
               <div>
                 <label htmlFor="ordererPhone" className="text-xs font-semibold text-neutral-400 mb-1.5 block">
@@ -470,8 +515,18 @@ export default function CheckoutPage() {
                   value={form.ordererPhone}
                   onChange={handleInputChange}
                   placeholder="연락처 입력 (예: 010-1234-5678)"
-                  className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#FFD700] transition-colors"
+                  className={`w-full bg-neutral-900 border rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none transition-colors ${
+                    fieldErrors.ordererPhone
+                      ? 'border-rose-500 focus:border-rose-500 ring-1 ring-rose-500'
+                      : 'border-neutral-700 focus:border-[#FFD700]'
+                  }`}
                 />
+                {fieldErrors.ordererPhone && (
+                  <p className="text-xs text-rose-400 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    <span>{fieldErrors.ordererPhone}</span>
+                  </p>
+                )}
               </div>
               <div>
                 <label htmlFor="ordererEmail" className="text-xs font-semibold text-neutral-400 mb-1.5 block">
@@ -485,17 +540,39 @@ export default function CheckoutPage() {
                   value={form.ordererEmail}
                   onChange={handleInputChange}
                   placeholder="이메일 입력 (예: runner@example.com)"
-                  className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#FFD700] transition-colors"
+                  className={`w-full bg-neutral-900 border rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none transition-colors ${
+                    fieldErrors.ordererEmail
+                      ? 'border-rose-500 focus:border-rose-500 ring-1 ring-rose-500'
+                      : 'border-neutral-700 focus:border-[#FFD700]'
+                  }`}
                 />
+                {fieldErrors.ordererEmail && (
+                  <p className="text-xs text-rose-400 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    <span>{fieldErrors.ordererEmail}</span>
+                  </p>
+                )}
               </div>
             </div>
           </div>
 
-          {/* 2. 배송지 정보 (Review Finding #6: id, htmlFor, aria-label) */}
+          {/* 2. 배송지 정보 */}
           <div className="p-6 rounded-2xl bg-[#141414] border border-[#262626] space-y-4 shadow-sm">
-            <div className="flex items-center space-x-2 pb-3 border-b border-neutral-800">
-              <Truck className="w-4 h-4 text-[#FFD700]" />
-              <h2 className="text-base font-black text-white">배송지 정보</h2>
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+              <div className="flex items-center space-x-2">
+                <Truck className="w-4 h-4 text-[#FFD700]" />
+                <h2 className="text-base font-black text-white">배송지 정보</h2>
+              </div>
+              <label htmlFor="sameAsOrderer" className="inline-flex items-center space-x-2 text-xs font-semibold text-neutral-300 cursor-pointer hover:text-white transition-colors">
+                <input
+                  type="checkbox"
+                  id="sameAsOrderer"
+                  checked={sameAsOrderer}
+                  onChange={handleSameAsOrdererChange}
+                  className="w-4 h-4 rounded border-neutral-700 bg-neutral-900 text-[#FFD700] focus:ring-[#FFD700] accent-[#FFD700]"
+                />
+                <span>주문자 정보와 동일</span>
+              </label>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -511,8 +588,18 @@ export default function CheckoutPage() {
                   value={form.recipientName}
                   onChange={handleInputChange}
                   placeholder="수령인 성명 입력"
-                  className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#FFD700] transition-colors"
+                  className={`w-full bg-neutral-900 border rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none transition-colors ${
+                    fieldErrors.recipientName
+                      ? 'border-rose-500 focus:border-rose-500 ring-1 ring-rose-500'
+                      : 'border-neutral-700 focus:border-[#FFD700]'
+                  }`}
                 />
+                {fieldErrors.recipientName && (
+                  <p className="text-xs text-rose-400 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    <span>{fieldErrors.recipientName}</span>
+                  </p>
+                )}
               </div>
               <div>
                 <label htmlFor="recipientPhone" className="text-xs font-semibold text-neutral-400 mb-1.5 block">
@@ -526,8 +613,18 @@ export default function CheckoutPage() {
                   value={form.recipientPhone}
                   onChange={handleInputChange}
                   placeholder="수령인 연락처 입력 (예: 010-1234-5678)"
-                  className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#FFD700] transition-colors"
+                  className={`w-full bg-neutral-900 border rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none transition-colors ${
+                    fieldErrors.recipientPhone
+                      ? 'border-rose-500 focus:border-rose-500 ring-1 ring-rose-500'
+                      : 'border-neutral-700 focus:border-[#FFD700]'
+                  }`}
                 />
+                {fieldErrors.recipientPhone && (
+                  <p className="text-xs text-rose-400 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    <span>{fieldErrors.recipientPhone}</span>
+                  </p>
+                )}
               </div>
             </div>
 
@@ -544,10 +641,20 @@ export default function CheckoutPage() {
                   value={form.shippingAddress}
                   onChange={handleInputChange}
                   placeholder="기본 배송 주소 입력 (예: 서울특별시 서초구 강남대로 123)"
-                  className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#FFD700] transition-colors"
+                  className={`w-full bg-neutral-900 border rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none transition-colors ${
+                    fieldErrors.shippingAddress
+                      ? 'border-rose-500 focus:border-rose-500 ring-1 ring-rose-500'
+                      : 'border-neutral-700 focus:border-[#FFD700]'
+                  }`}
                 />
                 <MapPin className="w-4 h-4 text-neutral-500 absolute right-3 top-3 pointer-events-none" />
               </div>
+              {fieldErrors.shippingAddress && (
+                <p className="text-xs text-rose-400 mt-1 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3 shrink-0" />
+                  <span>{fieldErrors.shippingAddress}</span>
+                </p>
+              )}
             </div>
 
             <div>

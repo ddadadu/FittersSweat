@@ -1,5 +1,3 @@
-'use client';
-
 import Link from 'next/link';
 import { Trophy, Zap, Sparkles, ArrowRight, ShieldCheck } from 'lucide-react';
 
@@ -7,7 +5,7 @@ export default function HomePage() {
   return (
     <div className="space-y-16 py-6">
       {/* Hero Section */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-neutral-900 via-neutral-950 to-black border border-neutral-800 p-8 sm:p-14 text-center sm:text-left flex flex-col lg:flex-row items-center justify-between gap-10">
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-neutral-900 via-neutral-950 to-black border border-neutral-800 p-6 sm:p-14 text-center sm:text-left flex flex-col lg:flex-row items-center justify-between gap-10">
         <div className="space-y-6 max-w-2xl">
           <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-[#FFD700]/10 border border-[#FFD700]/30 text-[#FFD700] text-xs font-bold tracking-wide">
             <span className="animate-pulse">●</span>
@@ -63,7 +61,7 @@ export default function HomePage() {
                 <span className="w-4 h-4 rounded-full bg-neutral-800 text-[10px] flex items-center justify-center text-[#FFD700] font-bold">
                   {idx + 1}
                 </span>
-                <span className="font-medium text-neutral-200 truncate">{station}</span>
+                <span className="font-medium text-neutral-200 text-xs break-keep leading-tight">{station}</span>
               </div>
             ))}
           </div>

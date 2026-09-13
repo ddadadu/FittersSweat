@@ -31,27 +31,27 @@ export default function Footer() {
           {/* Service Links */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-[#F5F5F5]">주요 서비스</h3>
-            <ul className="space-y-2.5 text-sm">
+            <ul className="space-y-1.5 text-sm">
               <li>
-                <Link href="/events" className="hover:text-[#FFD700] transition-colors flex items-center space-x-2">
+                <Link href="/events" className="hover:text-[#FFD700] transition-colors inline-flex items-center space-x-2 py-1.5 min-h-[36px]">
                   <Trophy className="w-3.5 h-3.5 text-[#FFD700]" />
                   <span>대회 일정</span>
                 </Link>
               </li>
               <li>
-                <Link href="/products" className="hover:text-[#FFD700] transition-colors flex items-center space-x-2">
+                <Link href="/products" className="hover:text-[#FFD700] transition-colors inline-flex items-center space-x-2 py-1.5 min-h-[36px]">
                   <ShoppingBag className="w-3.5 h-3.5 text-[#FFD700]" />
                   <span>장비몰</span>
                 </Link>
               </li>
               <li>
-                <Link href="/community" className="hover:text-[#FFD700] transition-colors flex items-center space-x-2">
+                <Link href="/community" className="hover:text-[#FFD700] transition-colors inline-flex items-center space-x-2 py-1.5 min-h-[36px]">
                   <MessageSquare className="w-3.5 h-3.5 text-[#FFD700]" />
                   <span>커뮤니티</span>
                 </Link>
               </li>
               <li>
-                <Link href="/search" className="hover:text-[#FFD700] transition-colors flex items-center space-x-2">
+                <Link href="/search" className="hover:text-[#FFD700] transition-colors inline-flex items-center space-x-2 py-1.5 min-h-[36px]">
                   <Sparkles className="w-3.5 h-3.5 text-[#FFD700]" />
                   <span>AI 맞춤추천</span>
                 </Link>
@@ -62,14 +62,14 @@ export default function Footer() {
           {/* Account / Support */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-[#F5F5F5]">계정 및 지원</h3>
-            <ul className="space-y-2.5 text-sm">
+            <ul className="space-y-1.5 text-sm">
               <li>
-                <Link href="/cart" className="hover:text-[#FFD700] transition-colors">
+                <Link href="/cart" className="hover:text-[#FFD700] transition-colors inline-flex items-center py-1.5 min-h-[36px]">
                   장바구니
                 </Link>
               </li>
               <li>
-                <Link href="/mypage" className="hover:text-[#FFD700] transition-colors">
+                <Link href="/mypage" className="hover:text-[#FFD700] transition-colors inline-flex items-center py-1.5 min-h-[36px]">
                   마이페이지
                 </Link>
               </li>
