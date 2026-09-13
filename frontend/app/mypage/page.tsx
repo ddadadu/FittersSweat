@@ -252,9 +252,9 @@ export default function MyPage() {
   const interestedEvents = eventsData?.events || [];
   const userPosts = postsData?.posts || [];
 
-  const userName = user?.name || '김하이록스';
-  const userEmail = user?.email || 'runner1@naver.com';
-  const joinDate = user?.createdAt ? formatDate(user.createdAt) : '2026.01.15';
+  const userName = user?.name || '러너';
+  const userEmail = user?.email || '';
+  const joinDate = user?.createdAt ? formatDate(user.createdAt) : formatDate(new Date().toISOString());
   const userInitial = userName.slice(0, 1).toUpperCase();
 
   const tabs = [

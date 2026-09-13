@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCartStore } from '@/stores/useCartStore';
-import { fetchApi } from '@/lib/api';
+import { fetchApi, ensureAuthToken } from '@/lib/api';
 import {
   CheckCircle2,
   AlertCircle,
@@ -44,23 +44,7 @@ function SuccessContent() {
 
     async function confirmPayment() {
       // 1. Ensure auth token is available
-      try {
-        const token = localStorage.getItem('accessToken');
-        if (!token) {
-          const loginRes = await fetchApi<{ accessToken: string }>('/api/v1/auth/login', {
-            method: 'POST',
-            body: JSON.stringify({
-              email: 'runner1@naver.com',
-              password: 'password123',
-            }),
-          });
-          if (loginRes.accessToken) {
-            localStorage.setItem('accessToken', loginRes.accessToken);
-          }
-        }
-      } catch (e) {
-        console.warn('Auth token renewal notice:', e);
-      }
+      await ensureAuthToken();
 
       // 2. Call backend approval endpoint: POST /api/v1/orders/:orderId/payment
       try {

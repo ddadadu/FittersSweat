@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { loadTossPayments, ANONYMOUS, TossPaymentsWidgets } from '@tosspayments/tosspayments-sdk';
 import { useCartStore } from '@/stores/useCartStore';
+import { useAuthStore } from '@/stores/useAuthStore';
 import { fetchApi, ensureAuthToken } from '@/lib/api';
 import {
   ShoppingBag,
@@ -273,7 +274,8 @@ export default function CheckoutPage() {
     // Ensure valid active JWT token exists via ensureAuthToken (auto-renews if expired)
     const token = await ensureAuthToken();
     if (!token) {
-      setErrorMessage('로그인 세션 인증에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+      setErrorMessage('주문을 진행하려면 로그인이 필요합니다.');
+      useAuthStore.getState().setAuthModalOpen(true, 'login');
       if (typeof window !== 'undefined') {
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }

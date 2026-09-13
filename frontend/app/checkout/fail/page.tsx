@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { fetchApi } from '@/lib/api';
+import { fetchApi, ensureAuthToken } from '@/lib/api';
 import {
   AlertCircle,
   RotateCcw,
@@ -29,23 +29,7 @@ function FailContent() {
 
     async function executeStockRollback() {
       // 1. Ensure auth token is valid
-      try {
-        const token = localStorage.getItem('accessToken');
-        if (!token) {
-          const loginRes = await fetchApi<{ accessToken: string }>('/api/v1/auth/login', {
-            method: 'POST',
-            body: JSON.stringify({
-              email: 'runner1@naver.com',
-              password: 'password123',
-            }),
-          });
-          if (loginRes.accessToken) {
-            localStorage.setItem('accessToken', loginRes.accessToken);
-          }
-        }
-      } catch (e) {
-        console.warn('Auth token renewal notice on fail page:', e);
-      }
+      await ensureAuthToken();
 
       // 2. Lookup amount if missing from query params
       let orderAmount = amount ? Number(amount) : 0;

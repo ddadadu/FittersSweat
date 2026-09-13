@@ -33,7 +33,20 @@ export async function ensureAuthToken(): Promise<string | null> {
       if (parts.length === 3) {
         const payload = JSON.parse(atob(parts[1]));
         if (payload.exp && payload.exp * 1000 < Date.now()) {
+          // Token expired -> attempt refresh with refreshToken
+          const refreshToken = localStorage.getItem('refreshToken');
+          if (refreshToken) {
+            const res = await fetchApi<{ accessToken: string }>('/api/v1/auth/refresh', {
+              method: 'POST',
+              body: JSON.stringify({ refreshToken }),
+            });
+            if (res.accessToken) {
+              localStorage.setItem('accessToken', res.accessToken);
+              return res.accessToken;
+            }
+          }
           localStorage.removeItem('accessToken');
+          return null;
         } else {
           return existing;
         }
@@ -41,21 +54,10 @@ export async function ensureAuthToken(): Promise<string | null> {
         return existing;
       }
     } catch {
-      // If parsing fails, fall through to re-login
+      localStorage.removeItem('accessToken');
+      return null;
     }
   }
 
-  try {
-    const res = await fetchApi<{ accessToken: string }>('/api/v1/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email: 'runner1@naver.com', password: 'password123' }),
-    });
-    if (res.accessToken) {
-      localStorage.setItem('accessToken', res.accessToken);
-      return res.accessToken;
-    }
-  } catch (err) {
-    console.warn('Auto-login test account failed:', err);
-  }
   return null;
 }

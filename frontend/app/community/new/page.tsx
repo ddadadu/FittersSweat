@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import ProductSearchModal, { SearchProduct } from '@/components/ProductSearchModal';
 import { fetchApi, ensureAuthToken } from '@/lib/api';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 interface HyroxEvent {
   id: string;
@@ -115,8 +116,14 @@ export default function NewCommunityPostPage() {
     isSubmittingRef.current = true;
 
     try {
-      // Ensure test user auth token
-      await ensureAuthToken();
+      const token = await ensureAuthToken();
+      if (!token) {
+        setSubmitError('게시글을 등록하려면 로그인이 필요합니다.');
+        useAuthStore.getState().setAuthModalOpen(true, 'login');
+        setIsSubmitting(false);
+        isSubmittingRef.current = false;
+        return;
+      }
 
       const payload = {
         title: title.trim(),

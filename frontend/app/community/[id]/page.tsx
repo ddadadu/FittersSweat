@@ -16,6 +16,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { fetchApi, ensureAuthToken } from '@/lib/api';
+import { useAuthStore } from '@/stores/useAuthStore';
 
 interface TaggedProduct {
   id: string;
@@ -144,8 +145,13 @@ export default function PostDetailPage() {
 
     setSubmittingComment(true);
     try {
-      // Auto-authenticate test account if no token present
-      await ensureAuthToken();
+      const token = await ensureAuthToken();
+      if (!token) {
+        setCommentError('댓글을 작성하려면 로그인이 필요합니다.');
+        useAuthStore.getState().setAuthModalOpen(true, 'login');
+        setSubmittingComment(false);
+        return;
+      }
 
       const res = await fetchApi<{ success: boolean; comment: CommentItem }>(
         `/api/v1/posts/${id}/comments`,
