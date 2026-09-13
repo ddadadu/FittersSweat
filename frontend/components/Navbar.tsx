@@ -49,10 +49,20 @@ export default function Navbar() {
     }
   }, [itemCount, mounted]);
 
-  // Auto close mobile drawer on navigation
+  // Close mobile menu on route change
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [pathname]);
+
+  // Close mobile menu on Escape key
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileMenuOpen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [mobileMenuOpen]);
 
   const navLinks = [
     { href: "/events", label: "대회 일정", icon: Trophy },
@@ -157,6 +167,7 @@ export default function Navbar() {
             className="md:hidden min-w-[44px] min-h-[44px] flex items-center justify-center p-2.5 rounded-lg text-[#A3A3A3] hover:text-white hover:bg-[#1F1F1F] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFD700]"
             aria-label={mobileMenuOpen ? "메뉴 닫기" : "메뉴 열기"}
             aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-nav-menu"
           >
             {mobileMenuOpen ? (
               <X className="w-6 h-6" />
@@ -169,7 +180,10 @@ export default function Navbar() {
 
       {/* Mobile Dropdown Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-[#262626] bg-[#0A0A0A]/95 backdrop-blur-md px-4 pt-2 pb-6 space-y-2">
+        <div
+          id="mobile-nav-menu"
+          className="md:hidden border-t border-[#262626] bg-[#0A0A0A]/95 backdrop-blur-md px-4 pt-2 pb-6 space-y-2 max-h-[calc(100vh-4rem)] overflow-y-auto"
+        >
           <div className="flex flex-col space-y-1">
             {navLinks.map((link) => {
               const Icon = link.icon;
