@@ -237,4 +237,146 @@ export async function authRoutes(app: FastifyInstance) {
       });
     }
   );
+
+  const updateProfileSchema = z.object({
+    name: z.string().min(1).optional(),
+    currentPassword: z.string().optional(),
+    newPassword: z.string().min(6).optional(),
+  });
+
+  const deleteAccountSchema = z.object({
+    password: z.string().min(1),
+  });
+
+  // 5. 내 정보 수정 (PATCH /api/v1/auth/me)
+  app.patch(
+    '/me',
+    {
+      schema: {
+        tags: ['Auth'],
+        summary: '내 정보 수정',
+        description: '사용자 이름 또는 비밀번호를 변경합니다.',
+      },
+    },
+    async (request, reply) => {
+      let userId: bigint;
+      try {
+        const token = request.headers.authorization?.replace('Bearer ', '');
+        if (!token) throw new Error('Missing token');
+        const decoded = app.jwt.verify<{ id: string }>(token);
+        userId = BigInt(decoded.id);
+      } catch {
+        return reply.status(401).send({ message: 'Unauthorized' });
+      }
+
+      const parseResult = updateProfileSchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply.status(400).send({ message: 'Invalid input', errors: parseResult.error.errors });
+      }
+
+      const { name, currentPassword, newPassword } = parseResult.data;
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (!user) {
+        return reply.status(404).send({ message: 'User not found' });
+      }
+
+      const updateData: { name?: string; passwordHash?: string } = {};
+
+      if (name) {
+        updateData.name = name;
+      }
+
+      if (newPassword) {
+        if (!currentPassword) {
+          return reply.status(400).send({ message: '현재 비밀번호를 입력해 주세요.' });
+        }
+        const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+        if (!valid) {
+          return reply.status(400).send({ message: '현재 비밀번호가 일치하지 않습니다.' });
+        }
+        updateData.passwordHash = await bcrypt.hash(newPassword, 10);
+      }
+
+      const updated = await prisma.user.update({
+        where: { id: userId },
+        data: updateData,
+        select: { id: true, email: true, name: true, role: true, createdAt: true },
+      });
+
+      return reply.send({
+        success: true,
+        user: { ...updated, id: updated.id.toString() },
+      });
+    }
+  );
+
+  // 6. 로그아웃 (POST /api/v1/auth/logout)
+  app.post(
+    '/logout',
+    {
+      schema: {
+        tags: ['Auth'],
+        summary: '로그아웃',
+        description: '세션을 종료합니다.',
+      },
+    },
+    async (request, reply) => {
+      return reply.send({ success: true, message: 'Logged out successfully' });
+    }
+  );
+
+  // 7. 회원 탈퇴 (DELETE /api/v1/auth/me)
+  app.delete(
+    '/me',
+    {
+      schema: {
+        tags: ['Auth'],
+        summary: '회원 탈퇴',
+        description: '비밀번호 확인 후 사용자와 연관된 데이터를 정리하고 계정을 삭제합니다.',
+      },
+    },
+    async (request, reply) => {
+      let userId: bigint;
+      try {
+        const token = request.headers.authorization?.replace('Bearer ', '');
+        if (!token) throw new Error('Missing token');
+        const decoded = app.jwt.verify<{ id: string }>(token);
+        userId = BigInt(decoded.id);
+      } catch {
+        return reply.status(401).send({ message: 'Unauthorized' });
+      }
+
+      const parseResult = deleteAccountSchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply.status(400).send({ message: '비밀번호를 입력해 주세요.' });
+      }
+
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (!user) {
+        return reply.status(404).send({ message: 'User not found' });
+      }
+
+      const valid = await bcrypt.compare(parseResult.data.password, user.passwordHash);
+      if (!valid) {
+        return reply.status(400).send({ message: '비밀번호가 일치하지 않습니다.' });
+      }
+
+      // Atomic cascading cleanup for orders and user
+      await prisma.$transaction(async (tx) => {
+        await tx.orderItem.deleteMany({ where: { order: { userId } } });
+        await tx.order.deleteMany({ where: { userId } });
+        await tx.postProductTag.deleteMany({ where: { post: { userId } } });
+        await tx.postComment.deleteMany({ where: { userId } });
+        await tx.post.deleteMany({ where: { userId } });
+        await tx.review.deleteMany({ where: { userId } });
+        await tx.interestedEvent.deleteMany({ where: { userId } });
+        await tx.user.delete({ where: { id: userId } });
+      });
+
+      return reply.send({
+        success: true,
+        message: '회원 탈퇴가 안전하게 완료되었습니다.',
+      });
+    }
+  );
 }

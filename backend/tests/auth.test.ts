@@ -128,4 +128,98 @@ describe('Auth API (/api/v1/auth)', () => {
     expect(body.user).toHaveProperty('role');
     expect(body.user).toHaveProperty('createdAt');
   });
+
+  it('PATCH /api/v1/auth/me - should update user name and verify profile', async () => {
+    const loginRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/login',
+      payload: { email: testUser.email, password: testUser.password },
+    });
+    const token = JSON.parse(loginRes.payload).accessToken;
+
+    const patchRes = await app.inject({
+      method: 'PATCH',
+      url: '/api/v1/auth/me',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { name: '새로운이름' },
+    });
+
+    expect(patchRes.statusCode).toBe(200);
+    const body = JSON.parse(patchRes.payload);
+    expect(body.success).toBe(true);
+    expect(body.user.name).toBe('새로운이름');
+  });
+
+  it('PATCH /api/v1/auth/me - should fail password change if current password is wrong', async () => {
+    const loginRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/login',
+      payload: { email: testUser.email, password: testUser.password },
+    });
+    const token = JSON.parse(loginRes.payload).accessToken;
+
+    const patchRes = await app.inject({
+      method: 'PATCH',
+      url: '/api/v1/auth/me',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { currentPassword: 'wrongcurrentpassword', newPassword: 'newpassword123' },
+    });
+
+    expect(patchRes.statusCode).toBe(400);
+  });
+
+  it('POST /api/v1/auth/logout - should return success response', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/logout',
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.payload).success).toBe(true);
+  });
+
+  it('DELETE /api/v1/auth/me - should fail with incorrect password', async () => {
+    const loginRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/login',
+      payload: { email: testUser.email, password: testUser.password },
+    });
+    const token = JSON.parse(loginRes.payload).accessToken;
+
+    const deleteRes = await app.inject({
+      method: 'DELETE',
+      url: '/api/v1/auth/me',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { password: 'wrongpassword' },
+    });
+
+    expect(deleteRes.statusCode).toBe(400);
+  });
+
+  it('DELETE /api/v1/auth/me - should delete user account cleanly with correct password', async () => {
+    const loginRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/login',
+      payload: { email: testUser.email, password: testUser.password },
+    });
+    const token = JSON.parse(loginRes.payload).accessToken;
+
+    const deleteRes = await app.inject({
+      method: 'DELETE',
+      url: '/api/v1/auth/me',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { password: testUser.password },
+    });
+
+    expect(deleteRes.statusCode).toBe(200);
+    expect(JSON.parse(deleteRes.payload).success).toBe(true);
+
+    // Verify user is gone
+    const meRes = await app.inject({
+      method: 'GET',
+      url: '/api/v1/auth/me',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(meRes.statusCode).toBe(404);
+  });
 });
