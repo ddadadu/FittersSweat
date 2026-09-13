@@ -126,25 +126,25 @@ graph TD
 
 ---
 
-### Task 3-3: Toss Payments SDK 결제 위젯 & E2E 결제 플로우
+### Task 3-3: Toss Payments SDK 결제 위젯 & E2E 결제 플로우 (완료)
 * **참조 기준**: [E2E 테스트 시나리오 3](../../e2e_테스트.md#시나리오-3-장바구니-담기-및-toss-payments-결제-플로우-cart--checkout-flow)
 * **Files**:
   - `frontend/app/checkout/page.tsx`
   - `frontend/app/checkout/success/page.tsx`
   - `frontend/app/checkout/fail/page.tsx`
 
-- [ ] **Step 1: Toss Payments 공식 SDK v2 클라이언트 초기화**
-- [ ] **Step 2: 주문서 작성 및 재고 선차감 연동 (`/checkout`)**
+- [x] **Step 1: Toss Payments 공식 SDK v2 클라이언트 초기화**
+- [x] **Step 2: 주문서 작성 및 재고 선차감 연동 (`/checkout`)**
   - 배송지 입력 ➔ 백엔드 `POST /api/v1/orders` 호출 (트랜잭션 재고 선차감)
-- [ ] **Step 3: 토스 결제 위젯 렌더링 및 결제 요청**
-  - 수신된 `orderId`와 `totalAmount`로 결제창 호출
-- [ ] **Step 4: 승인 및 롤백 처리**
+- [x] **Step 3: 토스 결제 위젯 렌더링 및 결제 요청**
+  - 수신된 `orderId`와 `totalAmount`로 결제창 호출 및 모의 테스트 옵션 제공
+- [x] **Step 4: 승인 및 롤백 처리**
   - 성공 (`/checkout/success`): 백엔드 최종 승인 호출 ➔ 장바구니 비우기 ➔ 완료 영수증 출력
   - 실패 (`/checkout/fail`): 백엔드 재고 롤백 ➔ 에러 사유 안내 및 장바구니 유지
 
 ---
 
-### Task 3-4: 커뮤니티 도메인 UI 구축 (피드 / 상세 / 글작성)
+### Task 3-4: 커뮤니티 도메인 UI 구축 (피드 / 상세 / 글작성) (완료)
 * **참조 기준**: [디자인 가이드라인 4.6](../../디자인_가이드라인.md#46-커뮤니티-포스트-카드-post-card), [E2E 테스트 시나리오 4](../../e2e_테스트.md#시나리오-4-커뮤니티-레이서-완주-후기-및-장비-태깅-community--gear-tagging)
 * **Files**:
   - `frontend/app/community/page.tsx`
@@ -153,15 +153,15 @@ graph TD
   - `frontend/components/PostCard.tsx`
   - `frontend/components/ProductSearchModal.tsx`
 
-- [ ] **Step 1: 재사용 가능한 `PostCard` 컴포넌트 구현**
+- [x] **Step 1: 재사용 가능한 `PostCard` 컴포넌트 구현**
   - 대회 태그 배지, 작성자 완주 배지, 제목, 요약 본문, 댓글 수, 태그된 직매입 장비 칩
-- [ ] **Step 2: 커뮤니티 메인 피드 (`/community`)**
-  - 대회별 필터 탭 및 [완주 후기 & 훈련팁 작성하기] 액션 헤더
-- [ ] **Step 3: 게시글 상세 페이지 (`/community/[id]`)**
-  - 본문 훈련담 및 태그된 실제 장비 카드 노출 (클릭 시 `/products/[id]` 1탭 이동)
+- [x] **Step 2: 커뮤니티 메인 피드 (`/community`)**
+  - 대회별 필터 탭 및 [완주 후기 & 훈련팁 작성하기] 액션 헤더, 최신순/댓글순 정렬
+- [x] **Step 3: 게시글 상세 페이지 (`/community/[id]`)**
+  - 본문 훈련담 및 태그된 실제 장비 카드 노출 (클릭 시 `/products/[id]` 1탭 이동), RAG 1문장 요약 골드 콜아웃 박스
   - 댓글 목록 및 실시간 댓글 작성
-- [ ] **Step 4: 게시글 작성 & 장비 태그 모달 (`/community/new`)**
-  - 대회 선택, 제목, 본문 에디터
+- [x] **Step 4: 게시글 작성 & 장비 태그 모달 (`/community/new`)**
+  - 대회 선택, 제목, 본문 에디터, beforeunload 이탈 방지
   - 장비 검색 모달(`AnimatePresence` 팝업): 400개 상품 중 검색하여 후기에 장비 외래키 매핑
 
 ---
@@ -185,21 +185,24 @@ graph TD
 
 ---
 
-### Task 3-6: 마이페이지 및 전체 E2E 통합 검증
+### Task 3-6: 마이페이지 및 전체 E2E 통합 검증 (완료)
 * **참조 기준**: [E2E 테스트 명세서 전체 시나리오 1~4](../../e2e_테스트.md)
 * **Files**:
   - `frontend/app/mypage/page.tsx`
+  - `backend/src/routes/events.ts`
+  - `backend/src/routes/auth.ts`
+  - `backend/src/routes/posts.ts`
 
-- [ ] **Step 1: 마이페이지 UI 구현 (`/mypage`)**
+- [x] **Step 1: 마이페이지 UI 구현 (`/mypage`)**
   - 프로필 대시보드 및 3대 탭(내 주문 내역, 관심 대회, 내 활동 게시글)
-- [ ] **Step 2: E2E 4대 사용자 여정 시나리오 검증**
+- [x] **Step 2: E2E 4대 사용자 여정 시나리오 검증**
   - 시나리오 1: 대회 탐색 & 관심 대회 등록
   - 시나리오 2: 400개 카탈로그 필터링 및 1:1 상세 뷰어 (CLS 0)
   - 시나리오 3: 장바구니 수량 조절/삭제(퇴장 모션) & Toss Payments 결제 완결
   - 시나리오 4: 커뮤니티 후기 작성 & 직매입 장비 태깅 연계
-- [ ] **Step 3: 시각적 결함 8대 체크리스트 최종 통과 확인**
+- [x] **Step 3: 시각적 결함 8대 체크리스트 최종 통과 확인**
   - 대비율 4.5:1, 터치타겟 44px, 모바일 safe-area, Lucide SVG 100%
-- [ ] **Step 4: 백엔드/프론트엔드 빌드 및 Git 동기화**
-  - `cd backend && npm test` (33개 테스트 ALL PASS)
-  - `cd frontend && npm run build` (Type & Bundle 통과)
+- [x] **Step 4: 백엔드/프론트엔드 빌드 및 Git 동기화**
+  - `cd backend && npm test` (40개 테스트 ALL PASS)
+  - `cd frontend && npm run build` (13개 라우트 ALL PASS)
   - Git 브랜치 `week-3` 커밋 및 푸시
