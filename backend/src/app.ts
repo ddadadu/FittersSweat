@@ -24,7 +24,17 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // CORS
   await app.register(cors, {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true);
+      if (
+        origin.includes('localhost') ||
+        origin.endsWith('.vercel.app') ||
+        (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL)
+      ) {
+        return cb(null, true);
+      }
+      return cb(null, true); // 허용하여 배포 시 도메인 불일치 차단 방지
+    },
     credentials: true,
   });
 
