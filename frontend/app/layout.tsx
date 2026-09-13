@@ -16,7 +16,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko">
-      <body className="flex flex-col min-h-screen bg-[#121212] text-white">
+      <body className="flex flex-col min-h-screen bg-canvas text-[#F5F5F5]">
         <Providers>
           <Navbar />
           <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">

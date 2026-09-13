@@ -3,14 +3,19 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 255, 255, 255;
-  --background-start-rgb: 18, 18, 18;
-  --background-end-rgb: 0, 0, 0;
+  --background: #0A0A0A;
+  --foreground: #F5F5F5;
+  --canvas: #0A0A0A;
+  --surface: #141414;
+  --elevated: #1F1F1F;
+  --subtle: #262626;
+  --hyrox-gold: #FFD700;
+  --hyrox-lime: #CCFF00;
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: #121212;
+  color: #F5F5F5;
+  background-color: #0A0A0A;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans KR', sans-serif;
   min-height: 100vh;
 }

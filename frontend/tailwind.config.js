@@ -8,14 +8,20 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        canvas: '#0A0A0A',
+        surface: '#141414',
+        elevated: '#1F1F1F',
+        subtle: '#262626',
         hyrox: {
+          gold: '#FFD700',
+          lime: '#CCFF00',
           yellow: '#FFD700',
-          dark: '#121212',
-          card: '#1E1E1E',
+          dark: '#0A0A0A',
+          card: '#141414',
           accent: '#FF3366',
-        }
-      }
+        },
+      },
     },
   },
   plugins: [],
-}
+};
