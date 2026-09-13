@@ -19,6 +19,33 @@ export async function eventRoutes(app: FastifyInstance) {
     });
   });
 
+  // 1-1. 관심 대회 목록 조회 (인증 필수)
+  app.get('/interested', async (request, reply) => {
+    let userId: bigint;
+    try {
+      const token = request.headers.authorization?.replace('Bearer ', '');
+      if (!token) throw new Error('Missing token');
+      const decoded = app.jwt.verify<{ id: string }>(token);
+      userId = BigInt(decoded.id);
+    } catch {
+      return reply.status(401).send({ message: 'Unauthorized' });
+    }
+
+    const interested = await prisma.interestedEvent.findMany({
+      where: { userId },
+      include: { event: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return reply.send({
+      success: true,
+      events: interested.map((item) => ({
+        ...item.event,
+        id: item.event.id.toString(),
+      })),
+    });
+  });
+
   // 2. 대회 상세 조회
   app.get('/:id', async (request, reply) => {
     const { id } = request.params as { id: string };

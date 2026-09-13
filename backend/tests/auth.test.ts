@@ -90,4 +90,42 @@ describe('Auth API (/api/v1/auth)', () => {
     expect(body.success).toBe(true);
     expect(body).toHaveProperty('accessToken');
   });
+
+  it('GET /api/v1/auth/me - should require auth header', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/auth/me',
+    });
+
+    expect(response.statusCode).toBe(401);
+  });
+
+  it('GET /api/v1/auth/me - should return user profile with valid token', async () => {
+    const loginRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/login',
+      payload: {
+        email: testUser.email,
+        password: testUser.password,
+      },
+    });
+    const token = JSON.parse(loginRes.payload).accessToken;
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/v1/auth/me',
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.payload);
+    expect(body.success).toBe(true);
+    expect(body.user).toHaveProperty('id');
+    expect(body.user.email).toBe(testUser.email);
+    expect(body.user.name).toBe(testUser.name);
+    expect(body.user).toHaveProperty('role');
+    expect(body.user).toHaveProperty('createdAt');
+  });
 });

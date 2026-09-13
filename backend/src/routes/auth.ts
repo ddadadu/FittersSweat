@@ -190,4 +190,51 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.status(401).send({ message: 'Invalid or expired refresh token' });
     }
   });
+
+
+  // 4. 내 프로필 조회
+  app.get(
+    '/me',
+    {
+      schema: {
+        tags: ['Auth'],
+        summary: '내 프로필 조회',
+        description: '인증 토큰으로 현재 로그인한 사용자의 정보를 조회합니다.',
+      },
+    },
+    async (request, reply) => {
+      let userId: bigint;
+      try {
+        const token = request.headers.authorization?.replace('Bearer ', '');
+        if (!token) throw new Error('Missing token');
+        const decoded = app.jwt.verify<{ id: string }>(token);
+        userId = BigInt(decoded.id);
+      } catch {
+        return reply.status(401).send({ message: 'Unauthorized' });
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          createdAt: true,
+        },
+      });
+
+      if (!user) {
+        return reply.status(404).send({ message: 'User not found' });
+      }
+
+      return reply.send({
+        success: true,
+        user: {
+          ...user,
+          id: user.id.toString(),
+        },
+      });
+    }
+  );
 }

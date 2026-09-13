@@ -92,5 +92,50 @@ describe('Events API & Scraper (/api/v1/events)', () => {
       expect(body.success).toBe(true);
       expect(body).toHaveProperty('isInterested');
     });
+
+    it('GET /api/v1/events/interested - should require auth header', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/v1/events/interested',
+      });
+
+      expect(response.statusCode).toBe(401);
+    });
+
+    it('GET /api/v1/events/interested - should return interested events with auth', async () => {
+      // Ensure event is registered as interested
+      const checkRes = await app.inject({
+        method: 'GET',
+        url: '/api/v1/events/interested',
+        headers: {
+          authorization: `Bearer ${authToken}`,
+        },
+      });
+      expect(checkRes.statusCode).toBe(200);
+      const checkBody = JSON.parse(checkRes.payload);
+      if (!checkBody.events.some((e: any) => e.id === eventId)) {
+        await app.inject({
+          method: 'POST',
+          url: `/api/v1/events/${eventId}/interested`,
+          headers: {
+            authorization: `Bearer ${authToken}`,
+          },
+        });
+      }
+
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/v1/events/interested',
+        headers: {
+          authorization: `Bearer ${authToken}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = JSON.parse(response.payload);
+      expect(body.success).toBe(true);
+      expect(Array.isArray(body.events)).toBe(true);
+      expect(body.events.some((e: any) => e.id === eventId)).toBe(true);
+    });
   });
 });

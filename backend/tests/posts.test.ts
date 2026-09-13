@@ -139,4 +139,30 @@ describe('Community Posts API (/api/v1/posts)', () => {
     expect(body.success).toBe(true);
     expect(body.posts.length).toBe(0);
   });
+
+  it('GET /api/v1/posts?userId=... - should filter posts by user ID', async () => {
+    // runner1 user ID is 1 (or we can get from me or posts)
+    const meRes = await app.inject({
+      method: 'GET',
+      url: '/api/v1/auth/me',
+      headers: {
+        authorization: `Bearer ${authToken}`,
+      },
+    });
+    const currentUserId = JSON.parse(meRes.payload).user.id;
+
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/posts?userId=${currentUserId}`,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.payload);
+    expect(body.success).toBe(true);
+    expect(Array.isArray(body.posts)).toBe(true);
+    // Every returned post must have userId == currentUserId
+    for (const post of body.posts) {
+      expect(post.userId).toBe(currentUserId);
+    }
+  });
 });

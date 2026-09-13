@@ -6,9 +6,12 @@ const prisma = new PrismaClient();
 export async function postRoutes(app: FastifyInstance) {
   // 1. 커뮤니티 게시글 목록 조회 (대회별 필터링 옵션)
   app.get('/', async (request, reply) => {
-    const { eventId } = request.query as { eventId?: string };
+    const { eventId, userId } = request.query as { eventId?: string; userId?: string };
 
-    const where = eventId ? { eventId: BigInt(eventId) } : {};
+    const where = {
+      ...(eventId ? { eventId: BigInt(eventId) } : {}),
+      ...(userId ? { userId: BigInt(userId) } : {}),
+    };
     const posts = await prisma.post.findMany({
       where,
       orderBy: { createdAt: 'desc' },
