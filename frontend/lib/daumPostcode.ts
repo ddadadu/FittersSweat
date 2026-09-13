@@ -2,7 +2,7 @@ import type { DaumPostcodeData, DaumPostcodeResult } from '@/types/daum';
 
 export type { DaumPostcodeData, DaumPostcodeResult } from '@/types/daum';
 
-export const DAUM_POSTCODE_SCRIPT_URL = '//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
+export const DAUM_POSTCODE_SCRIPT_URL = 'https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
 
 let scriptLoadingPromise: Promise<void> | null = null;
 
@@ -28,7 +28,7 @@ export function loadDaumPostcodeScript(): Promise<void> {
   scriptLoadingPromise = new Promise<void>((resolve, reject) => {
     // Check if script tag is already present in DOM
     const existingScript = document.querySelector<HTMLScriptElement>(
-      `script[src="${DAUM_POSTCODE_SCRIPT_URL}"]`
+      'script[src*="postcode.v2.js"]'
     );
 
     const handleSuccess = () => {
@@ -80,7 +80,7 @@ export function formatDaumAddress(data: DaumPostcodeData): DaumPostcodeResult {
 
   if (data.userSelectedType === 'R') {
     // 법정동명이 있을 경우 추가 (법정리는 제외, '동/로/가'로 끝남)
-    if (data.bname && /[동|로|가]$/.test(data.bname)) {
+    if (data.bname && /[동로가]$/.test(data.bname)) {
       extraAddress += data.bname;
     }
     // 건물명이 있고 공동주택일 경우 추가
@@ -93,7 +93,7 @@ export function formatDaumAddress(data: DaumPostcodeData): DaumPostcodeResult {
     }
   }
 
-  const fullAddress = `${baseAddress}${extraAddress}`;
+  const fullAddress = `${baseAddress}${extraAddress}`.trim();
 
   return {
     zonecode: data.zonecode,
