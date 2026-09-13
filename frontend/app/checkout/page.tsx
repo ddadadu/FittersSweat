@@ -21,7 +21,9 @@ import {
   Lock,
   ChevronLeft,
   Check,
+  Search,
 } from 'lucide-react';
+import { openDaumPostcodePopup, loadDaumPostcodeScript } from '@/lib/daumPostcode';
 
 interface OrderFormState {
   ordererName: string;
@@ -29,6 +31,7 @@ interface OrderFormState {
   ordererEmail: string;
   recipientName: string;
   recipientPhone: string;
+  postcode: string;
   shippingAddress: string;
   shippingDetailAddress: string;
   deliveryRequest: string;
@@ -48,6 +51,7 @@ export default function CheckoutPage() {
     ordererEmail: '',
     recipientName: '',
     recipientPhone: '',
+    postcode: '',
     shippingAddress: '',
     shippingDetailAddress: '',
     deliveryRequest: '',
@@ -63,12 +67,13 @@ export default function CheckoutPage() {
   const widgetsRef = useRef<TossPaymentsWidgets | null>(null);
   const totalAmount = getTotalAmount();
 
-  // 1. Mount & Auth Guard: Ensure valid token exists; auto-refresh if expired
+  // 1. Mount & Auth Guard: Ensure valid token exists; auto-refresh if expired; preload Daum Postcode script
   useEffect(() => {
     setMounted(true);
     ensureAuthToken().catch((err) =>
       console.warn('Auto auth validation notice:', err)
     );
+    loadDaumPostcodeScript().catch(() => {});
 
     return () => {
       widgetsRef.current = null;
@@ -189,6 +194,29 @@ export default function CheckoutPage() {
     }
   };
 
+  const handleOpenPostcodeSearch = async () => {
+    try {
+      await openDaumPostcodePopup((result) => {
+        setForm((prev) => ({
+          ...prev,
+          postcode: result.zonecode,
+          shippingAddress: result.fullAddress,
+        }));
+        setFieldErrors((prev) => {
+          const next = { ...prev };
+          delete next.postcode;
+          delete next.shippingAddress;
+          return next;
+        });
+        setTimeout(() => {
+          document.getElementById('shippingDetailAddress')?.focus();
+        }, 100);
+      });
+    } catch (err) {
+      console.warn('Failed to open Daum Postcode popup:', err);
+    }
+  };
+
   // Form Validation and Order Creation
   const validateAndCreateOrder = async (): Promise<string | null> => {
     const errors: Record<string, string> = {};
@@ -218,8 +246,8 @@ export default function CheckoutPage() {
       errors.recipientPhone = '올바른 수령인 연락처를 입력해 주세요 (예: 010-1234-5678).';
     }
 
-    if (!form.shippingAddress.trim()) {
-      errors.shippingAddress = '배송지 기본 주소를 입력해 주세요.';
+    if (!form.postcode.trim() || !form.shippingAddress.trim()) {
+      errors.shippingAddress = '우편번호 검색을 통해 배송지 기본 주소를 입력해 주세요.';
     }
 
     if (Object.keys(errors).length > 0) {
@@ -628,33 +656,60 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            <div>
-              <label htmlFor="shippingAddress" className="text-xs font-semibold text-neutral-400 mb-1.5 block">
-                배송지 기본 주소 <span className="text-rose-400">*</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  id="shippingAddress"
-                  name="shippingAddress"
-                  aria-label="배송지 기본 주소"
-                  value={form.shippingAddress}
-                  onChange={handleInputChange}
-                  placeholder="기본 배송 주소 입력 (예: 서울특별시 서초구 강남대로 123)"
-                  className={`w-full bg-neutral-900 border rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none transition-colors ${
-                    fieldErrors.shippingAddress
-                      ? 'border-rose-500 focus:border-rose-500 ring-1 ring-rose-500'
-                      : 'border-neutral-700 focus:border-[#FFD700]'
-                  }`}
-                />
-                <MapPin className="w-4 h-4 text-neutral-500 absolute right-3 top-3 pointer-events-none" />
+            {/* 우편번호 및 기본 주소 */}
+            <div className="space-y-3">
+              <div>
+                <label htmlFor="postcode" className="text-xs font-semibold text-neutral-400 mb-1.5 block">
+                  우편번호 및 기본 주소 <span className="text-rose-400">*</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    id="postcode"
+                    name="postcode"
+                    aria-label="우편번호"
+                    readOnly
+                    value={form.postcode}
+                    placeholder="우편번호 (5자리)"
+                    className="w-36 bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm text-white font-mono placeholder:text-neutral-500 focus:outline-none focus:border-[#FFD700]"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleOpenPostcodeSearch}
+                    className="min-h-[44px] px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 hover:border-[#FFD700] text-xs font-bold text-white transition-all flex items-center gap-1.5 shrink-0 active:scale-[0.98]"
+                  >
+                    <Search className="w-4 h-4 text-[#FFD700]" />
+                    <span>우편번호 검색</span>
+                  </button>
+                </div>
               </div>
-              {fieldErrors.shippingAddress && (
-                <p className="text-xs text-rose-400 mt-1 flex items-center gap-1">
-                  <AlertCircle className="w-3 h-3 shrink-0" />
-                  <span>{fieldErrors.shippingAddress}</span>
-                </p>
-              )}
+
+              <div>
+                <div className="relative">
+                  <input
+                    type="text"
+                    id="shippingAddress"
+                    name="shippingAddress"
+                    aria-label="배송지 기본 주소"
+                    readOnly
+                    onClick={handleOpenPostcodeSearch}
+                    value={form.shippingAddress}
+                    placeholder="우편번호 검색 버튼을 눌러 주소를 검색하세요"
+                    className={`w-full bg-neutral-900 border rounded-xl px-4 py-2.5 pr-10 text-sm text-white cursor-pointer placeholder:text-neutral-500 focus:outline-none transition-colors ${
+                      fieldErrors.shippingAddress
+                        ? 'border-rose-500 focus:border-rose-500 ring-1 ring-rose-500'
+                        : 'border-neutral-700 focus:border-[#FFD700]'
+                    }`}
+                  />
+                  <MapPin className="w-4 h-4 text-neutral-500 absolute right-3.5 top-3.5 pointer-events-none" />
+                </div>
+                {fieldErrors.shippingAddress && (
+                  <p className="text-xs text-rose-400 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3 shrink-0" />
+                    <span>{fieldErrors.shippingAddress}</span>
+                  </p>
+                )}
+              </div>
             </div>
 
             <div>
