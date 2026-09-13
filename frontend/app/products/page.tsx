@@ -68,26 +68,20 @@ export default function ProductsPage() {
     setPage(1);
   };
 
-  // Build query endpoint
-  const queryParams = new URLSearchParams();
-  queryParams.set('page', String(page));
-  queryParams.set('limit', '20');
-  queryParams.set('sort', sortOrder);
-  if (selectedCategory !== 'ALL') {
-    queryParams.set('categoryId', selectedCategory);
-  }
-  if (debouncedSearch) {
-    queryParams.set('search', debouncedSearch);
-  }
-
   const { data, isLoading, error } = useQuery<ProductsResponse>({
     queryKey: ['products', selectedCategory, debouncedSearch, sortOrder, page],
     queryFn: () => {
-      const catParam = selectedCategory !== 'ALL' ? `&categoryId=${selectedCategory}` : '';
-      const searchParam = debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : '';
-      return fetchApi<ProductsResponse>(
-        `/api/v1/products?page=${page}&limit=20&sort=${sortOrder}${catParam}${searchParam}`
-      );
+      const queryParams = new URLSearchParams();
+      queryParams.set('page', String(page));
+      queryParams.set('limit', '20');
+      queryParams.set('sort', sortOrder);
+      if (selectedCategory && selectedCategory.toLowerCase() !== 'all') {
+        queryParams.set('categoryId', selectedCategory.toLowerCase());
+      }
+      if (debouncedSearch) {
+        queryParams.set('search', debouncedSearch);
+      }
+      return fetchApi<ProductsResponse>(`/api/v1/products?${queryParams.toString()}`);
     },
   });
 

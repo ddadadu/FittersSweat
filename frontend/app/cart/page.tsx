@@ -147,7 +147,7 @@ export default function CartPage() {
                   {/* Title & Unit Price */}
                   <div className="space-y-1 min-w-0 flex-1">
                     <span className="text-[10px] font-black uppercase tracking-wider text-[#FFD700]">
-                      {item.categoryId.toUpperCase()}
+                      {(item.categoryId || 'GEAR').toUpperCase()}
                     </span>
                     <Link
                       href={`/products/${item.productId}`}
@@ -180,8 +180,9 @@ export default function CartPage() {
                     <button
                       type="button"
                       onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                      disabled={item.stockQuantity !== undefined && item.quantity >= item.stockQuantity}
                       aria-label={`${item.name} 수량 1 증가`}
-                      className="min-w-[44px] min-h-[44px] flex items-center justify-center text-sm font-bold text-neutral-300 hover:text-white hover:bg-neutral-800 transition-colors"
+                      className="min-w-[44px] min-h-[44px] flex items-center justify-center text-sm font-bold text-neutral-300 hover:text-white hover:bg-neutral-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                     >
                       +
                     </button>

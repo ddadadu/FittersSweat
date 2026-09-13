@@ -37,7 +37,7 @@ export default function ProductCard({ product }: ProductCardProps) {
   const addItem = useCartStore((state) => state.addItem);
 
   const brand = product.name.split(' ')[0] || 'HYROX';
-  const categoryLabel = CATEGORY_NAMES[product.categoryId.toLowerCase()] || product.categoryId.toUpperCase();
+  const categoryLabel = CATEGORY_NAMES[product.categoryId?.toLowerCase() || ''] || product.categoryId?.toUpperCase() || 'GEAR';
   const rating = product.rating ?? 5.0;
   const isOutOfStock = product.stockQuantity <= 0;
   const isLowStock = product.stockQuantity > 0 && product.stockQuantity <= 5;
@@ -74,7 +74,7 @@ export default function ProductCard({ product }: ProductCardProps) {
       />
 
       {/* Top Visual Area: 1:1 aspect-square for CLS 0 */}
-      <div className="relative aspect-square w-full bg-neutral-900 overflow-hidden">
+      <div className="relative aspect-square w-full bg-neutral-900 overflow-hidden pointer-events-none">
         {hasValidImage ? (
           <Image
             src={product.imageUrl!}

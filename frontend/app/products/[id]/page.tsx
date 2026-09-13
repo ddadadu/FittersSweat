@@ -137,7 +137,7 @@ export default function ProductDetailPage() {
   const isLowStock = product.stockQuantity > 0 && product.stockQuantity <= 5;
   const displayImage = product.detailImageUrl || product.imageUrl;
   const hasValidImage = !!displayImage && !imgError;
-  const categoryTitle = CATEGORY_NAMES[product.categoryId.toLowerCase()] || product.categoryId.toUpperCase();
+  const categoryName = CATEGORY_NAMES[product.categoryId?.toLowerCase() || ''] || product.categoryId || '장비';
 
   const averageRating = reviews.length > 0
     ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
@@ -213,7 +213,7 @@ export default function ProductDetailPage() {
             {/* Category Tag Overlay */}
             <div className="absolute top-4 left-4 z-10">
               <span className="px-3 py-1 rounded-full bg-black/80 backdrop-blur-md text-[#FFD700] border border-[#FFD700]/30 text-xs font-black uppercase tracking-wider shadow-md">
-                {product.categoryId.toUpperCase()}
+                {(product.categoryId || 'GEAR').toUpperCase()}
               </span>
             </div>
 
@@ -249,7 +249,7 @@ export default function ProductDetailPage() {
             {/* Category & Stock Badges */}
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-bold text-neutral-400 uppercase tracking-wide">
-                {categoryTitle}
+                {categoryName}
               </span>
               {isOutOfStock ? (
                 <span className="px-3 py-1 rounded-full text-xs font-black bg-rose-950/80 text-rose-400 border border-rose-800/50">
