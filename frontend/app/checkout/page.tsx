@@ -253,19 +253,19 @@ export default function CheckoutPage() {
     setErrorMessage(null);
     setIsSubmitting(true);
 
+    // Check widget readiness before creating pending backend order
+    if (!widgetsRef.current) {
+      setErrorMessage(
+        '토스 결제 위젯이 아직 준비되지 않았습니다. 잠시 후 다시 시도하시거나 아래 테스트 결제 버튼을 이용해 주세요.'
+      );
+      setIsSubmitting(false);
+      return;
+    }
+
     let orderId: string | null = null;
     try {
       orderId = await validateAndCreateOrder();
       if (!orderId) {
-        setIsSubmitting(false);
-        return;
-      }
-
-      // Review Finding #2: If widget is not available, do NOT redirect to mock success!
-      if (!widgetsRef.current) {
-        setErrorMessage(
-          '토스 결제 위젯이 아직 준비되지 않았습니다. 잠시 후 다시 시도하시거나 아래 테스트 결제 버튼을 이용해 주세요.'
-        );
         setIsSubmitting(false);
         return;
       }
