@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useEffect, useState, Suspense } from 'react';
+import React, { useEffect, useRef, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCartStore } from '@/stores/useCartStore';
 import { fetchApi } from '@/lib/api';
 import {
   CheckCircle2,
-  ArrowRight,
+  AlertCircle,
   ShoppingBag,
   PackageCheck,
   ShieldCheck,
@@ -27,12 +27,18 @@ function SuccessContent() {
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [approvedDate, setApprovedDate] = useState<string>('');
 
+  // Review Finding #3: Idempotent guard to prevent duplicate payment confirmation calls in React 18 Strict Mode
+  const hasConfirmedRef = useRef(false);
+
   useEffect(() => {
     if (!orderId || !paymentKey || !amount) {
       setStatus('error');
       setErrorMessage('결제 승인에 필요한 주문 파라미터가 누락되었습니다.');
       return;
     }
+
+    if (hasConfirmedRef.current) return;
+    hasConfirmedRef.current = true;
 
     let isMounted = true;
 
@@ -113,11 +119,12 @@ function SuccessContent() {
     );
   }
 
+  // Review Finding #7: Use AlertCircle instead of CheckCircle2 when status is error
   if (status === 'error') {
     return (
       <div className="max-w-xl mx-auto py-20 text-center space-y-6">
         <div className="w-20 h-20 mx-auto rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 shadow-xl">
-          <CheckCircle2 className="w-10 h-10 opacity-30 text-rose-400" />
+          <AlertCircle className="w-10 h-10 text-rose-400" />
         </div>
         <div className="space-y-2">
           <h1 className="text-2xl font-black text-white tracking-tight">

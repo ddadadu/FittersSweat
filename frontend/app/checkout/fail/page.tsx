@@ -8,7 +8,6 @@ import {
   AlertCircle,
   RotateCcw,
   ShoppingBag,
-  ArrowRight,
   ShieldAlert,
   HelpCircle,
 } from 'lucide-react';
@@ -75,11 +74,23 @@ function FailContent() {
             amount: orderAmount,
           }),
         });
-      } catch (err) {
-        // Backend returns 400 when cancelling and rolling back stock, confirming the rollback succeeded.
-        console.log('Stock rollback executed successfully by backend transaction:', err);
-      } finally {
         setRollbackComplete(true);
+      } catch (err: any) {
+        // Review Finding #4: Inspect error message in catch block before marking rollbackComplete(true)
+        const msg = (err.message || '').toLowerCase();
+        console.log('Stock rollback response from backend:', err.message);
+        if (
+          msg.includes('rejected') ||
+          msg.includes('취소') ||
+          msg.includes('복구') ||
+          msg.includes('cancelled') ||
+          msg.includes('결제할 수 없는')
+        ) {
+          setRollbackComplete(true);
+        } else {
+          console.warn('Rollback request encountered unexpected failure:', err);
+          setRollbackComplete(false);
+        }
       }
     }
 

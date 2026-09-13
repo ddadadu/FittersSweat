@@ -85,11 +85,27 @@ export default function CheckoutPage() {
     }
 
     checkAndEnsureAuth();
+
+    return () => {
+      widgetsRef.current = null;
+    };
   }, []);
 
-  // 2. Initialize Toss Payments SDK v2 Widgets
+  // 2. Initialize or Update Toss Payments SDK v2 Widgets
   useEffect(() => {
     if (!mounted || items.length === 0 || totalAmount <= 0) {
+      setIsWidgetLoading(false);
+      return;
+    }
+
+    // Review Finding #5: If widgets instance already exists, update amount dynamically
+    if (widgetsRef.current) {
+      widgetsRef.current
+        .setAmount({
+          currency: 'KRW',
+          value: totalAmount,
+        })
+        .catch((e) => console.warn('Failed to update widget amount:', e));
       setIsWidgetLoading(false);
       return;
     }
@@ -164,6 +180,14 @@ export default function CheckoutPage() {
       setErrorMessage('주문자 이메일을 입력해 주세요.');
       return null;
     }
+
+    // Review Finding #9: Basic email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(form.ordererEmail.trim())) {
+      setErrorMessage('올바른 이메일 형식을 입력해 주세요 (예: runner1@naver.com).');
+      return null;
+    }
+
     if (!form.recipientName.trim()) {
       setErrorMessage('수령인 이름을 입력해 주세요.');
       return null;
@@ -229,9 +253,19 @@ export default function CheckoutPage() {
     setErrorMessage(null);
     setIsSubmitting(true);
 
+    let orderId: string | null = null;
     try {
-      const orderId = await validateAndCreateOrder();
+      orderId = await validateAndCreateOrder();
       if (!orderId) {
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Review Finding #2: If widget is not available, do NOT redirect to mock success!
+      if (!widgetsRef.current) {
+        setErrorMessage(
+          '토스 결제 위젯이 아직 준비되지 않았습니다. 잠시 후 다시 시도하시거나 아래 테스트 결제 버튼을 이용해 주세요.'
+        );
         setIsSubmitting(false);
         return;
       }
@@ -241,25 +275,27 @@ export default function CheckoutPage() {
           ? items[0].name
           : `${items[0].name} 외 ${items.length - 1}건`;
 
-      if (widgetsRef.current) {
-        await widgetsRef.current.requestPayment({
-          orderId,
-          orderName,
-          successUrl: `${window.location.origin}/checkout/success`,
-          failUrl: `${window.location.origin}/checkout/fail?amount=${totalAmount}`,
-          customerEmail: form.ordererEmail,
-          customerName: form.ordererName,
-        });
-      } else {
-        // Fallback if widget not mounted in headless environment
-        router.push(
-          `/checkout/success?paymentKey=test_mock_success_key&orderId=${orderId}&amount=${totalAmount}`
-        );
-      }
+      await widgetsRef.current.requestPayment({
+        orderId,
+        orderName,
+        successUrl: `${window.location.origin}/checkout/success`,
+        failUrl: `${window.location.origin}/checkout/fail?amount=${totalAmount}`,
+        customerEmail: form.ordererEmail,
+        customerName: form.ordererName,
+      });
     } catch (err: any) {
-      console.error('Payment request failed:', err);
-      setErrorMessage(err.message || '결제 진행 중 오류가 발생했습니다.');
-      setIsSubmitting(false);
+      console.error('Payment request failed or cancelled:', err);
+      // Review Finding #1: On requestPayment rejection/cancellation, route to fail page with orderId for stock rollback
+      const code = err.code || 'USER_CANCEL';
+      const msg = err.message || '사용자가 결제를 취소하였거나 결제 진행 중 오류가 발생했습니다.';
+      if (orderId) {
+        router.push(
+          `/checkout/fail?code=${encodeURIComponent(code)}&message=${encodeURIComponent(msg)}&orderId=${orderId}&amount=${totalAmount}`
+        );
+      } else {
+        setErrorMessage(msg);
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -375,17 +411,21 @@ export default function CheckoutPage() {
         </div>
       </div>
 
-      {/* Error Banner Modal / Alert */}
+      {/* Error Banner Modal / Alert (Review Finding #8: min 44x44px touch target on dismiss) */}
       {errorMessage && (
-        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-start space-x-3 text-rose-300 animate-fadeIn">
-          <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
-          <div className="flex-1 text-sm">
-            <span className="font-bold">결제 오류 안내: </span>
-            <span>{errorMessage}</span>
+        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-between space-x-3 text-rose-300 animate-fadeIn">
+          <div className="flex items-start space-x-3">
+            <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+            <div className="text-sm">
+              <span className="font-bold">결제 오류 안내: </span>
+              <span>{errorMessage}</span>
+            </div>
           </div>
           <button
+            type="button"
             onClick={() => setErrorMessage(null)}
-            className="text-xs text-rose-400 hover:text-rose-200 font-bold px-2 py-1"
+            aria-label="오류 안내 닫기"
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center text-xs text-rose-400 hover:text-rose-200 font-bold px-3 py-2 rounded-lg hover:bg-rose-500/10 transition-colors shrink-0"
           >
             닫기
           </button>
@@ -395,7 +435,7 @@ export default function CheckoutPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         {/* Left 2 Columns: Forms and Toss Widget */}
         <div className="lg:col-span-2 space-y-6">
-          {/* 1. 주문자 정보 */}
+          {/* 1. 주문자 정보 (Review Finding #6: id, htmlFor, aria-label) */}
           <div className="p-6 rounded-2xl bg-[#141414] border border-[#262626] space-y-4 shadow-sm">
             <div className="flex items-center space-x-2 pb-3 border-b border-neutral-800">
               <User className="w-4 h-4 text-[#FFD700]" />
@@ -404,12 +444,14 @@ export default function CheckoutPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="text-xs font-semibold text-neutral-400 mb-1.5 block">
+                <label htmlFor="ordererName" className="text-xs font-semibold text-neutral-400 mb-1.5 block">
                   주문자명 <span className="text-rose-400">*</span>
                 </label>
                 <input
                   type="text"
+                  id="ordererName"
                   name="ordererName"
+                  aria-label="주문자명"
                   value={form.ordererName}
                   onChange={handleInputChange}
                   placeholder="홍길동"
@@ -417,12 +459,14 @@ export default function CheckoutPage() {
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-neutral-400 mb-1.5 block">
+                <label htmlFor="ordererPhone" className="text-xs font-semibold text-neutral-400 mb-1.5 block">
                   연락처 <span className="text-rose-400">*</span>
                 </label>
                 <input
                   type="tel"
+                  id="ordererPhone"
                   name="ordererPhone"
+                  aria-label="주문자 연락처"
                   value={form.ordererPhone}
                   onChange={handleInputChange}
                   placeholder="010-1234-5678"
@@ -430,12 +474,14 @@ export default function CheckoutPage() {
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-neutral-400 mb-1.5 block">
+                <label htmlFor="ordererEmail" className="text-xs font-semibold text-neutral-400 mb-1.5 block">
                   이메일 <span className="text-rose-400">*</span>
                 </label>
                 <input
                   type="email"
+                  id="ordererEmail"
                   name="ordererEmail"
+                  aria-label="주문자 이메일"
                   value={form.ordererEmail}
                   onChange={handleInputChange}
                   placeholder="runner@example.com"
@@ -445,7 +491,7 @@ export default function CheckoutPage() {
             </div>
           </div>
 
-          {/* 2. 배송지 정보 */}
+          {/* 2. 배송지 정보 (Review Finding #6: id, htmlFor, aria-label) */}
           <div className="p-6 rounded-2xl bg-[#141414] border border-[#262626] space-y-4 shadow-sm">
             <div className="flex items-center space-x-2 pb-3 border-b border-neutral-800">
               <Truck className="w-4 h-4 text-[#FFD700]" />
@@ -454,12 +500,14 @@ export default function CheckoutPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-semibold text-neutral-400 mb-1.5 block">
+                <label htmlFor="recipientName" className="text-xs font-semibold text-neutral-400 mb-1.5 block">
                   수령인 <span className="text-rose-400">*</span>
                 </label>
                 <input
                   type="text"
+                  id="recipientName"
                   name="recipientName"
+                  aria-label="수령인 이름"
                   value={form.recipientName}
                   onChange={handleInputChange}
                   placeholder="수령인 이름"
@@ -467,12 +515,14 @@ export default function CheckoutPage() {
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-neutral-400 mb-1.5 block">
+                <label htmlFor="recipientPhone" className="text-xs font-semibold text-neutral-400 mb-1.5 block">
                   수령인 연락처 <span className="text-rose-400">*</span>
                 </label>
                 <input
                   type="tel"
+                  id="recipientPhone"
                   name="recipientPhone"
+                  aria-label="수령인 연락처"
                   value={form.recipientPhone}
                   onChange={handleInputChange}
                   placeholder="010-1234-5678"
@@ -482,13 +532,15 @@ export default function CheckoutPage() {
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-neutral-400 mb-1.5 block">
+              <label htmlFor="shippingAddress" className="text-xs font-semibold text-neutral-400 mb-1.5 block">
                 배송지 기본 주소 <span className="text-rose-400">*</span>
               </label>
               <div className="relative">
                 <input
                   type="text"
+                  id="shippingAddress"
                   name="shippingAddress"
+                  aria-label="배송지 기본 주소"
                   value={form.shippingAddress}
                   onChange={handleInputChange}
                   placeholder="도로명 주소 입력"
@@ -499,12 +551,14 @@ export default function CheckoutPage() {
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-neutral-400 mb-1.5 block">
+              <label htmlFor="shippingDetailAddress" className="text-xs font-semibold text-neutral-400 mb-1.5 block">
                 상세 주소
               </label>
               <input
                 type="text"
+                id="shippingDetailAddress"
                 name="shippingDetailAddress"
+                aria-label="상세 주소"
                 value={form.shippingDetailAddress}
                 onChange={handleInputChange}
                 placeholder="상세 주소 (동/호수, 층수 등)"
@@ -513,12 +567,14 @@ export default function CheckoutPage() {
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-neutral-400 mb-1.5 block">
+              <label htmlFor="deliveryRequest" className="text-xs font-semibold text-neutral-400 mb-1.5 block">
                 배송 요청사항
               </label>
               <input
                 type="text"
+                id="deliveryRequest"
                 name="deliveryRequest"
+                aria-label="배송 요청사항"
                 value={form.deliveryRequest}
                 onChange={handleInputChange}
                 placeholder="예: 부재 시 문 앞에 놓아주세요."
@@ -649,7 +705,7 @@ export default function CheckoutPage() {
             )}
           </button>
 
-          {/* Mock Test Options Section (Step 1 Requirement) */}
+          {/* Mock Test Options Section */}
           <div className="p-4 rounded-xl bg-neutral-900/80 border border-neutral-800 space-y-3 text-xs">
             <div className="flex items-center space-x-1.5 text-neutral-300 font-bold">
               <Sparkles className="w-3.5 h-3.5 text-[#FFD700]" />
