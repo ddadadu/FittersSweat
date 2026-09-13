@@ -10,7 +10,8 @@
     "test": "jest",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "db:seed:community": "tsx prisma/seed-community.ts"
   },
   "dependencies": {
     "@fastify/cors": "^8.4.0",

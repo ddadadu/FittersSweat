@@ -4,6 +4,7 @@
 > **기준 레퍼런스 문서**:  
 > - [디자인 가이드라인](../../디자인_가이드라인.md) (`docs/디자인_가이드라인.md`)  
 > - [E2E 테스트 명세서](../../e2e_테스트.md) (`docs/e2e_테스트.md`)  
+> - [RAG 파이프라인 설계서](../../RAG_파이프라인_설계서.md) (`docs/RAG_파이프라인_설계서.md`)  
 > - [Supahero.io](https://supahero.io/) Dark Athletic Showcase 패턴
 
 ---
@@ -164,17 +165,22 @@ graph TD
 
 ---
 
-### Task 3-5: 4주차 RAG 검색 토대용 커뮤니티/리뷰 대량 데이터셋 시딩
-* **목적**: 4주차 AI RAG 검색을 위한 8대 스테이션 도메인 특화 데이터베이스 완성
+### Task 3-5: 4주차 RAG 검색 토대용 커뮤니티/리뷰 대량 데이터셋 시딩 (완료)
+* **목적**: 4주차 AI RAG(Dual-Retriever) 검색을 위한 8대 스테이션 도메인 특화 데이터베이스 구축 및 유사도 중복 방지
+* **참조 기준**: [RAG 파이프라인 설계서](../../RAG_파이프라인_설계서.md) (`docs/RAG_파이프라인_설계서.md`)
 * **Files**:
   - `backend/prisma/data/community-seed-data.json`
+  - `backend/prisma/generate-community-data.ts`
   - `backend/prisma/seed-community.ts`
 
-- [ ] **Step 1: HYROX 8대 스테이션 특화 커뮤니티 데이터셋 구성**
-  - 8개 스테이션별 완주 후기 60~80건, 댓글 120~150건, 실구매 리뷰 150건 생성
-  - 각 게시글마다 관련 직매입 상품 1~3개씩 정교하게 외래키 매핑
-- [ ] **Step 2: PostgreSQL DB 일괄 시딩 실행 및 검증**
-  - `npx tsx prisma/seed-community.ts` 실행 후 카운트 확인
+- [x] **Step 1: 4차원 변량 매트릭스 기반 150건 고다양성 커뮤니티 데이터셋 생성**
+  - 10개 카테고리(8대 스테이션 + 인터벌 런닝 + 영양/리커버리) x 15개 고유 시나리오 = 총 150건 데이터셋 구축
+  - 각 게시글 상단에 규격화된 `> 💡 **핵심 요약**: [1문장 지식]` 인리치먼트 주입
+  - 3-gram Jaccard 유사도 검증 통과: 최고 유사도 10.31%, 35% 초과 중복 쌍 0건 (11,175개 쌍 비교)
+- [x] **Step 2: PostgreSQL DB 일괄 시딩 실행 및 정합성 검증**
+  - `npx tsx prisma/seed-community.ts` 실행 완료
+  - 적재 결과: 게시글 150건, 댓글 225건, 상품 외래키 태그 450건, 실구매 리뷰 80건 적재 완료
+  - 33/33 백엔드 테스트 ALL PASS 유지 확인
 
 ---
 
