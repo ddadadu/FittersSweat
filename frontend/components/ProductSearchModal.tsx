@@ -80,7 +80,7 @@ export default function ProductSearchModal({
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // 4. Fetch products when debouncedSearch or category changes
+  // 4. Fetch products when debouncedSearch or category changes (limit=20)
   useEffect(() => {
     if (!isOpen) return;
 
@@ -95,7 +95,7 @@ export default function ProductSearchModal({
         if (selectedCategory && selectedCategory !== 'ALL') {
           params.set('categoryId', selectedCategory);
         }
-        params.set('limit', '10');
+        params.set('limit', '20');
 
         const res = await fetchApi<{ success: boolean; products: SearchProduct[] }>(
           `/api/v1/products?${params.toString()}`
@@ -120,19 +120,24 @@ export default function ProductSearchModal({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
+        >
           {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+          <div
             onClick={onClose}
             className="fixed inset-0 bg-black/80 backdrop-blur-sm"
           />
 
           {/* Modal Container */}
           <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="gear-modal-title"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
@@ -143,7 +148,7 @@ export default function ProductSearchModal({
             {/* Modal Header */}
             <div className="p-5 border-b border-[#262626] flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-black text-white flex items-center gap-2">
+                <h2 id="gear-modal-title" className="text-lg font-black text-white flex items-center gap-2">
                   <span>직매입 장비 검색 & 태깅</span>
                   <span className="text-xs font-bold text-black bg-[#FFD700] px-2 py-0.5 rounded">
                     400+ GEAR
@@ -174,6 +179,7 @@ export default function ProductSearchModal({
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="장비명 또는 브랜드 검색 (예: 푸마, 니슬리브, 에너지젤)..."
+                  aria-label="장비 검색"
                   className="w-full bg-[#1F1F1F] border border-[#333333] focus:border-[#FFD700] focus:ring-1 focus:ring-[#FFD700] rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder:text-[#737373] outline-none transition-all"
                 />
                 {searchTerm && (
@@ -181,6 +187,7 @@ export default function ProductSearchModal({
                     type="button"
                     onClick={() => setSearchTerm('')}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-[#737373] hover:text-white p-1"
+                    aria-label="검색어 지우기"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -305,7 +312,7 @@ export default function ProductSearchModal({
               </button>
             </div>
           </motion.div>
-        </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );

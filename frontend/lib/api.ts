@@ -27,7 +27,23 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
 export async function ensureAuthToken(): Promise<string | null> {
   if (typeof window === 'undefined') return null;
   const existing = localStorage.getItem('accessToken');
-  if (existing) return existing;
+  if (existing) {
+    try {
+      const parts = existing.split('.');
+      if (parts.length === 3) {
+        const payload = JSON.parse(atob(parts[1]));
+        if (payload.exp && payload.exp * 1000 < Date.now()) {
+          localStorage.removeItem('accessToken');
+        } else {
+          return existing;
+        }
+      } else {
+        return existing;
+      }
+    } catch {
+      // If parsing fails, fall through to re-login
+    }
+  }
 
   try {
     const res = await fetchApi<{ accessToken: string }>('/api/v1/auth/login', {

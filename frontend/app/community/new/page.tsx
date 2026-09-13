@@ -209,12 +209,18 @@ export default function NewCommunityPostPage() {
 
           {/* 2. Post Title Field */}
           <div className="space-y-2">
-            <label htmlFor="post-title" className="block text-xs font-bold text-neutral-300 uppercase tracking-wider">
-              제목 <span className="text-[#FFD700]">*</span>
-            </label>
+            <div className="flex items-center justify-between">
+              <label htmlFor="post-title" className="block text-xs font-bold text-neutral-300 uppercase tracking-wider">
+                제목 <span className="text-[#FFD700]">*</span>
+              </label>
+              <span className="text-[11px] text-[#737373]">
+                {title.length}/200
+              </span>
+            </div>
             <input
               id="post-title"
               type="text"
+              maxLength={200}
               value={title}
               onChange={(e) => {
                 setTitle(e.target.value);

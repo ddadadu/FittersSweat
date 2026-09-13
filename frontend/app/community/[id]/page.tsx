@@ -13,6 +13,7 @@ import {
   Loader2,
   Calendar,
   Send,
+  AlertCircle,
 } from 'lucide-react';
 import { fetchApi, ensureAuthToken } from '@/lib/api';
 
@@ -107,6 +108,7 @@ export default function PostDetailPage() {
 
   const [newComment, setNewComment] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
+  const [commentError, setCommentError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -137,6 +139,7 @@ export default function PostDetailPage() {
 
   const handleCommentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setCommentError(null);
     if (!newComment.trim() || submittingComment) return;
 
     setSubmittingComment(true);
@@ -155,10 +158,11 @@ export default function PostDetailPage() {
       if (res.comment) {
         setComments((prev) => [...prev, res.comment]);
         setNewComment('');
+        setCommentError(null);
       }
     } catch (err: any) {
       console.error('Comment submit error:', err);
-      alert(err.message || '댓글 등록에 실패했습니다.');
+      setCommentError(err.message || '댓글 등록에 실패했습니다. 다시 시도해 주세요.');
     } finally {
       setSubmittingComment(false);
     }
@@ -362,11 +366,24 @@ export default function PostDetailPage() {
           <form onSubmit={handleCommentSubmit} className="space-y-3">
             <textarea
               value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
+              onChange={(e) => {
+                setNewComment(e.target.value);
+                if (commentError) setCommentError(null);
+              }}
               placeholder="레이서에게 궁금한 점이나 응원의 댓글을 남겨보세요..."
               rows={3}
-              className="w-full bg-[#1F1F1F] border border-[#333333] focus:border-[#FFD700] focus:ring-1 focus:ring-[#FFD700] rounded-xl p-4 text-sm text-white placeholder:text-[#737373] outline-none transition-all resize-none"
+              className={`w-full bg-[#1F1F1F] border rounded-xl p-4 text-sm text-white placeholder:text-[#737373] outline-none transition-all resize-none ${
+                commentError
+                  ? 'border-[#EF4444] ring-1 ring-[#EF4444]'
+                  : 'border-[#333333] focus:border-[#FFD700] focus:ring-1 focus:ring-[#FFD700]'
+              }`}
             />
+            {commentError && (
+              <p className="text-xs text-[#EF4444] flex items-center gap-1.5 pt-0.5">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{commentError}</span>
+              </p>
+            )}
             <div className="flex justify-end">
               <button
                 type="submit"
