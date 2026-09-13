@@ -221,6 +221,11 @@ export async function postRoutes(app: FastifyInstance) {
           userId,
           content,
         },
+        include: {
+          user: {
+            select: { id: true, name: true },
+          },
+        },
       });
 
       return reply.status(201).send({
@@ -230,6 +235,10 @@ export async function postRoutes(app: FastifyInstance) {
           id: comment.id.toString(),
           postId: comment.postId.toString(),
           userId: comment.userId.toString(),
+          user: {
+            id: comment.user.id.toString(),
+            name: comment.user.name,
+          },
         },
       });
     } catch {

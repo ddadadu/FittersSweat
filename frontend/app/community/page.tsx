@@ -19,6 +19,7 @@ export default function CommunityPage() {
   const [events, setEvents] = useState<HyroxEvent[]>([]);
   const [posts, setPosts] = useState<PostItem[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string>('ALL');
+  const [sortBy, setSortBy] = useState<'latest' | 'comments'>('latest');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [debouncedSearch, setDebouncedSearch] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
@@ -68,24 +69,44 @@ export default function CommunityPage() {
     loadPosts();
   }, [selectedEventId]);
 
-  // 4. Client-side search filtering
+  // 4. Client-side search filtering and sorting
   const filteredPosts = useMemo(() => {
-    if (!debouncedSearch.trim()) return posts;
-    const query = debouncedSearch.toLowerCase().trim();
-    return posts.filter((p) => {
-      const matchTitle = p.title?.toLowerCase().includes(query);
-      const matchContent = p.content?.toLowerCase().includes(query);
-      const matchAuthor = p.user?.name?.toLowerCase().includes(query);
-      const matchTags = p.taggedItems?.some((ti) =>
-        ti.product?.name?.toLowerCase().includes(query)
-      );
-      return matchTitle || matchContent || matchAuthor || matchTags;
+    let result = posts;
+
+    // Filter by search query
+    if (debouncedSearch.trim()) {
+      const query = debouncedSearch.toLowerCase().trim();
+      result = result.filter((p) => {
+        const matchTitle = p.title?.toLowerCase().includes(query);
+        const matchContent = p.content?.toLowerCase().includes(query);
+        const matchAuthor = p.user?.name?.toLowerCase().includes(query);
+        const matchTags = p.taggedItems?.some((ti) =>
+          ti.product?.name?.toLowerCase().includes(query)
+        );
+        return matchTitle || matchContent || matchAuthor || matchTags;
+      });
+    }
+
+    // Apply sorting
+    return [...result].sort((a, b) => {
+      if (sortBy === 'comments') {
+        const countA = a.commentCount ?? a.postComments?.length ?? 0;
+        const countB = b.commentCount ?? b.postComments?.length ?? 0;
+        if (countB !== countA) {
+          return countB - countA;
+        }
+        // Tie-breaker: newest first
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+      // 'latest' default: newest first
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
-  }, [posts, debouncedSearch]);
+  }, [posts, debouncedSearch, sortBy]);
 
   const handleResetFilter = () => {
     setSelectedEventId('ALL');
     setSearchTerm('');
+    setSortBy('latest');
   };
 
   return (
@@ -153,8 +174,8 @@ export default function CommunityPage() {
             })}
           </div>
 
-          {/* Counter & Search Input */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
+          {/* Counter, Search Input & Sort Controls */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-2">
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-[#A3A3A3]">
                 총 <strong className="text-white font-black">{filteredPosts.length}</strong>개의 완주 후기
@@ -166,26 +187,47 @@ export default function CommunityPage() {
               )}
             </div>
 
-            {/* Search Box */}
-            <div className="relative w-full sm:w-80">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#737373]" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="후기 제목, 훈련팁, 장비 검색..."
-                className="w-full bg-[#141414] border border-[#262626] focus:border-[#FFD700] focus:ring-1 focus:ring-[#FFD700] rounded-xl pl-10 pr-10 py-2.5 text-sm text-white placeholder:text-[#737373] outline-none transition-all"
-              />
-              {searchTerm && (
-                <button
-                  type="button"
-                  onClick={() => setSearchTerm('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#737373] hover:text-white p-1"
-                  aria-label="검색어 지우기"
+            {/* Right Tools: Search Box & Sort Dropdown */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
+              {/* Search Box */}
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#737373]" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="후기 제목, 훈련팁, 장비 검색..."
+                  aria-label="후기 검색"
+                  className="w-full bg-[#141414] border border-[#262626] focus:border-[#FFD700] focus:ring-1 focus:ring-[#FFD700] rounded-xl pl-10 pr-10 py-2.5 text-sm text-white placeholder:text-[#737373] outline-none transition-all"
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#737373] hover:text-white p-1"
+                    aria-label="검색어 지우기"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Sort Dropdown */}
+              <div className="relative shrink-0">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as 'latest' | 'comments')}
+                  aria-label="게시글 정렬 기준"
+                  className="min-h-[44px] bg-[#141414] border border-[#262626] focus:border-[#FFD700] focus:ring-1 focus:ring-[#FFD700] text-white rounded-xl px-4 py-2.5 text-xs font-bold outline-none transition-all cursor-pointer w-full sm:w-auto"
                 >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
+                  <option value="latest" className="bg-[#141414] text-white">
+                    최신순
+                  </option>
+                  <option value="comments" className="bg-[#141414] text-white">
+                    댓글 많은순
+                  </option>
+                </select>
+              </div>
             </div>
           </div>
         </div>

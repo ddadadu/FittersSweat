@@ -124,6 +124,8 @@ describe('Community Posts API (/api/v1/posts)', () => {
     expect(body.success).toBe(true);
     expect(body.comment).toHaveProperty('id');
     expect(body.comment.content).toBe('정말 유익한 정보네요! 저도 이번에 그 신발 신어봐야겠습니다.');
+    expect(body.comment).toHaveProperty('user');
+    expect(body.comment.user).toHaveProperty('name');
   });
 
   it('GET /api/v1/posts?eventId=99999 - should filter posts by event ID', async () => {
