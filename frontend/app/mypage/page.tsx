@@ -23,7 +23,14 @@ import {
   ChevronRight,
   Clock,
   RefreshCw,
+  Settings,
+  LogOut,
+  Trash2,
+  LogIn,
 } from 'lucide-react';
+import { useAuthStore } from '@/stores/useAuthStore';
+import EditProfileModal from '@/components/EditProfileModal';
+import DeleteAccountModal from '@/components/DeleteAccountModal';
 
 interface UserProfile {
   id: string;
@@ -131,6 +138,16 @@ export default function MyPage() {
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('orders');
   const [imgErrors, setImgErrors] = useState<Record<string, boolean>>({});
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
+
+  const {
+    user: storeUser,
+    isAuthenticated,
+    isLoading: isAuthStoreLoading,
+    logout,
+    setAuthModalOpen,
+  } = useAuthStore();
 
   useEffect(() => {
     setMounted(true);
@@ -146,13 +163,12 @@ export default function MyPage() {
   } = useQuery<{ success: boolean; user: UserProfile }>({
     queryKey: ['auth', 'me'],
     queryFn: async () => {
-      await ensureAuthToken();
       return fetchApi<{ success: boolean; user: UserProfile }>('/api/v1/auth/me');
     },
-    enabled: mounted,
+    enabled: mounted && isAuthenticated,
   });
 
-  const user = authData?.user;
+  const user = authData?.user || storeUser;
   const userId = user?.id;
 
   // 2. Orders query: GET /api/v1/orders
@@ -164,10 +180,9 @@ export default function MyPage() {
   } = useQuery<{ success: boolean; orders: OrderRecord[] }>({
     queryKey: ['orders'],
     queryFn: async () => {
-      await ensureAuthToken();
       return fetchApi<{ success: boolean; orders: OrderRecord[] }>('/api/v1/orders');
     },
-    enabled: mounted,
+    enabled: mounted && isAuthenticated,
   });
 
   // 3. Interested events query: GET /api/v1/events/interested
@@ -179,10 +194,9 @@ export default function MyPage() {
   } = useQuery<{ success: boolean; events: EventItem[] }>({
     queryKey: ['events', 'interested'],
     queryFn: async () => {
-      await ensureAuthToken();
       return fetchApi<{ success: boolean; events: EventItem[] }>('/api/v1/events/interested');
     },
-    enabled: mounted,
+    enabled: mounted && isAuthenticated,
   });
 
   // 4. User posts query: GET /api/v1/posts?userId=${userId}
@@ -197,7 +211,7 @@ export default function MyPage() {
       if (!userId) return { success: true, posts: [] };
       return fetchApi<{ success: boolean; posts: PostItem[] }>(`/api/v1/posts?userId=${userId}`);
     },
-    enabled: mounted && !!userId,
+    enabled: mounted && isAuthenticated && !!userId,
   });
 
   // Review finding #2: Fix Flash of Empty State (FOES) for user posts
@@ -279,8 +293,35 @@ export default function MyPage() {
 
   return (
     <div className="max-w-6xl mx-auto py-8 sm:py-12 px-4 sm:px-6 space-y-8 pb-16">
-      {/* 1. Top Profile Dashboard / Auth Error State */}
-      {isAuthError ? (
+      {/* 1. Top Profile Dashboard / Guest State / Auth Error State */}
+      {!isAuthenticated && !isAuthStoreLoading ? (
+        <section
+          aria-label="로그인 안내"
+          className="relative overflow-hidden rounded-2xl bg-[#141414] border border-[#262626] p-8 sm:p-12 shadow-xl text-center space-y-5"
+        >
+          <div className="w-16 h-16 rounded-full bg-[#FFD700]/10 border border-[#FFD700]/20 flex items-center justify-center text-[#FFD700] mx-auto shadow-md">
+            <User className="w-8 h-8" />
+          </div>
+          <div className="space-y-2 max-w-md mx-auto">
+            <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+              로그인이 필요한 서비스입니다
+            </h2>
+            <p className="text-xs sm:text-sm text-[#A3A3A3] leading-relaxed">
+              FitterSweat 회원으로 로그인하여 내 주문 내역, 관심 대회, 작성한 완주 후기를 한눈에 확인하고 관리하세요.
+            </p>
+          </div>
+          <div className="pt-2 flex justify-center">
+            <button
+              type="button"
+              onClick={() => setAuthModalOpen(true, 'login')}
+              className="min-h-[48px] px-8 py-3.5 rounded-xl bg-[#FFD700] hover:bg-yellow-400 text-black font-black text-sm transition-all shadow-lg shadow-yellow-500/15 flex items-center gap-2 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFD700]"
+            >
+              <LogIn className="w-4 h-4" />
+              <span>로그인 / 회원가입</span>
+            </button>
+          </div>
+        </section>
+      ) : isAuthError ? (
         /* Review Finding #3: Auth Error State */
         <section
           aria-label="인증 오류 안내"
@@ -300,17 +341,11 @@ export default function MyPage() {
           <div className="pt-2 flex justify-center">
             <button
               type="button"
-              onClick={async () => {
-                localStorage.removeItem('accessToken');
-                await ensureAuthToken();
-                refetchAuth();
-                refetchOrders();
-                refetchEvents();
-              }}
+              onClick={() => setAuthModalOpen(true, 'login')}
               className="min-h-[44px] px-6 py-3 rounded-xl bg-[#FFD700] hover:bg-[#E6C200] text-black font-black text-xs transition-colors flex items-center gap-2 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFD700]"
             >
-              <RefreshCw className="w-4 h-4" />
-              <span>다시 로그인 / 재시도</span>
+              <LogIn className="w-4 h-4" />
+              <span>로그인하기</span>
             </button>
           </div>
         </section>
@@ -368,6 +403,39 @@ export default function MyPage() {
                   </span>
                 </div>
               </div>
+            </div>
+
+            {/* Action Buttons: Edit Profile, Logout, Delete Account */}
+            <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+              <button
+                type="button"
+                onClick={() => setEditProfileOpen(true)}
+                className="min-h-[44px] px-3.5 py-2 rounded-xl bg-[#1F1F1F] hover:bg-[#262626] border border-[#333333] hover:border-[#FFD700]/50 text-neutral-200 text-xs font-bold transition-colors flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFD700]"
+                aria-label="내 정보 수정"
+              >
+                <Settings className="w-3.5 h-3.5 text-[#FFD700]" />
+                <span>내 정보 수정</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => logout()}
+                className="min-h-[44px] px-3.5 py-2 rounded-xl bg-[#1F1F1F] hover:bg-neutral-800 border border-[#333333] text-neutral-300 hover:text-white text-xs font-semibold transition-colors flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-500"
+                aria-label="로그아웃"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>로그아웃</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setDeleteAccountOpen(true)}
+                className="min-h-[44px] px-3 py-2 rounded-xl text-neutral-500 hover:text-rose-400 hover:bg-rose-500/10 text-xs font-medium transition-colors flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
+                aria-label="회원탈퇴"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>회원탈퇴</span>
+              </button>
             </div>
           </div>
 
@@ -803,6 +871,23 @@ export default function MyPage() {
           )}
         </div>
       </div>
+
+      {/* Edit Profile Modal */}
+      <EditProfileModal
+        isOpen={editProfileOpen}
+        onClose={() => {
+          setEditProfileOpen(false);
+          refetchAuth();
+        }}
+        currentName={userName}
+        currentEmail={userEmail}
+      />
+
+      {/* Delete Account Modal */}
+      <DeleteAccountModal
+        isOpen={deleteAccountOpen}
+        onClose={() => setDeleteAccountOpen(false)}
+      />
     </div>
   );
 }
