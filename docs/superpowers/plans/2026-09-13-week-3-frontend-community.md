@@ -83,16 +83,16 @@ graph TD
   - `frontend/components/Footer.tsx`
   - `frontend/app/globals.css`
 
-- [ ] **Step 1: Framer Motion 및 CDN 인프라 설정**
+- [x] **Step 1: Framer Motion 및 CDN 인프라 설정**
   - `frontend/package.json`에 `framer-motion` 설치
   - `next.config.mjs`에 `res.cloudinary.com` remotePatterns 등록
-- [ ] **Step 2: 글로벌 스티키 블러 네비게이션 구현 (`Navbar.tsx`)**
+- [x] **Step 2: 글로벌 스티키 블러 네비게이션 구현 (`Navbar.tsx`)**
   - 높이 64px, `sticky top-0 z-50 bg-[#0A0A0A]/85 backdrop-blur-md`
   - 4대 메뉴(`대회 일정`, `장비몰`, `커뮤니티`, `마이페이지`) 및 활성 라우트 골드 언더라인
   - Lucide SVG 아이콘 통일 (이모지 배제)
-- [ ] **Step 3: 장바구니 실시간 카운트 뱃지 & 펄스 인터랙션**
+- [x] **Step 3: 장바구니 실시간 카운트 뱃지 & 펄스 인터랙션**
   - `useCartStore` 아이템 수량 연동 및 담기 이벤트 시 150ms 팝/펄스 애니메이션 적용
-- [ ] **Step 4: 빌드 검증**
+- [x] **Step 4: 빌드 검증**
   - `cd frontend && npm run build` 통과 확인
 
 ---
