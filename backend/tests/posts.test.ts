@@ -160,9 +160,21 @@ describe('Community Posts API (/api/v1/posts)', () => {
     const body = JSON.parse(res.payload);
     expect(body.success).toBe(true);
     expect(Array.isArray(body.posts)).toBe(true);
+    expect(body.posts.length).toBeGreaterThan(0);
     // Every returned post must have userId == currentUserId
     for (const post of body.posts) {
       expect(post.userId).toBe(currentUserId);
     }
+  });
+
+  it('GET /api/v1/posts?userId=invalid - should return 400 for non-numeric userId or eventId', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/posts?userId=invalid',
+    });
+
+    expect(res.statusCode).toBe(400);
+    const body = JSON.parse(res.payload);
+    expect(body.message).toContain('Invalid eventId or userId query parameter');
   });
 });

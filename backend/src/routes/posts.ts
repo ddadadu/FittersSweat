@@ -8,10 +8,15 @@ export async function postRoutes(app: FastifyInstance) {
   app.get('/', async (request, reply) => {
     const { eventId, userId } = request.query as { eventId?: string; userId?: string };
 
-    const where = {
-      ...(eventId ? { eventId: BigInt(eventId) } : {}),
-      ...(userId ? { userId: BigInt(userId) } : {}),
-    };
+    let where = {};
+    try {
+      where = {
+        ...(eventId ? { eventId: BigInt(eventId) } : {}),
+        ...(userId ? { userId: BigInt(userId) } : {}),
+      };
+    } catch {
+      return reply.status(400).send({ message: 'Invalid eventId or userId query parameter' });
+    }
     const posts = await prisma.post.findMany({
       where,
       orderBy: { createdAt: 'desc' },
