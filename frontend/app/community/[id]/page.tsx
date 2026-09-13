@@ -267,7 +267,7 @@ export default function PostDetailPage() {
                 <Sparkles className="w-5 h-5 text-[#FFD700] shrink-0 mt-0.5" />
                 <div className="space-y-1">
                   <div className="text-xs font-black uppercase tracking-wider text-[#FFD700] flex items-center gap-1.5">
-                    <span>AI 핵심 요약 (RAG Extraction)</span>
+                    <span>AI 핵심 요약</span>
                   </div>
                   <p className="text-sm sm:text-base font-medium text-white leading-relaxed">
                     {summary}

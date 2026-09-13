@@ -25,8 +25,6 @@ export default function Footer() {
                 <ShieldCheck className="w-3.5 h-3.5 text-[#10B981]" />
                 <span>100% 정품 직매입 보증</span>
               </span>
-              <span>•</span>
-              <span>Fastify 4 + Next.js 14 + pgvector</span>
             </div>
           </div>
 
@@ -74,11 +72,6 @@ export default function Footer() {
                 <Link href="/mypage" className="hover:text-[#FFD700] transition-colors">
                   마이페이지
                 </Link>
-              </li>
-              <li>
-                <span className="text-xs text-[#737373]">
-                  컴퓨터공학과 캡스톤 디자인 졸업작품
-                </span>
               </li>
             </ul>
           </div>

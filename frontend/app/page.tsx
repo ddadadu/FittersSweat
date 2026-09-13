@@ -21,7 +21,7 @@ export default function HomePage() {
 
           <p className="text-base sm:text-lg text-neutral-300 leading-relaxed">
             국내 최초 HYROX 특화 플랫폼. 공식 대회 일정 확인부터 8개 스테이션별 검증된 직매입 장비, 
-            그리고 레이서 전용 벡터 AI 검색 추천까지 한곳에서 경험하세요.
+            그리고 레이서 전용 AI 맞춤 장비 추천까지 한곳에서 경험하세요.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 pt-2">
@@ -49,7 +49,16 @@ export default function HomePage() {
             <span className="text-[#FFD700]">8 STATIONS / 8KM</span>
           </div>
           <div className="grid grid-cols-2 gap-2.5 text-xs">
-            {['1km SkiErg', '50m Sled Push', '50m Sled Pull', '80m Burpee Broad', '1km Row', '200m Farmers Carry', '100m Sandbag Lunge', '100 Wall Balls'].map((station, idx) => (
+            {[
+              '1km 스키에르그',
+              '50m 슬레드 푸시',
+              '50m 슬레드 풀',
+              '80m 버피 브로드 점프',
+              '1km 로잉',
+              '200m 파머스 캐리',
+              '100m 샌드백 런지',
+              '100개 월볼샷',
+            ].map((station, idx) => (
               <div key={station} className="p-2.5 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center space-x-2">
                 <span className="w-4 h-4 rounded-full bg-neutral-800 text-[10px] flex items-center justify-center text-[#FFD700] font-bold">
                   {idx + 1}
@@ -67,9 +76,9 @@ export default function HomePage() {
           <div className="w-10 h-10 rounded-xl bg-[#FFD700]/10 text-[#FFD700] flex items-center justify-center">
             <Trophy className="w-5 h-5" />
           </div>
-          <h2 className="text-lg font-bold text-white">실시간 대회 스크래핑 & 일정</h2>
+          <h2 className="text-lg font-bold text-white">실시간 대회 일정 & 알림</h2>
           <p className="text-sm text-neutral-400 leading-relaxed">
-            공식 사이트 크롤링을 통해 서울, 송도 등 국내외 HYROX 공식 대회 일정과 얼리버드 티켓 오픈 알림을 실시간 제공합니다.
+            서울, 송도 등 국내외 HYROX 공식 대회 일정과 티켓 오픈 알림을 실시간으로 확인하고 레이스를 준비하세요.
           </p>
         </div>
 
@@ -79,7 +88,7 @@ export default function HomePage() {
           </div>
           <h2 className="text-lg font-bold text-white">100% 정품 직매입 & 빠른 배송</h2>
           <p className="text-sm text-neutral-400 leading-relaxed">
-            PUMA Deviate NITRO 레이스화, SIS 에너지젤, 그립 장갑 등 실제 레이서들이 검증한 필수 장비를 직매입하여 토스페이먼츠로 안전 결제합니다.
+            레이싱화, 에너지젤, 그립 장갑 등 실제 완주 레이서들이 직접 검증한 필수 장비를 직매입하여 안전하고 빠르게 배송합니다.
           </p>
         </div>
 
@@ -87,9 +96,9 @@ export default function HomePage() {
           <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center">
             <Zap className="w-5 h-5" />
           </div>
-          <h2 className="text-lg font-bold text-white">AI 벡터 코사인 RAG 검색</h2>
+          <h2 className="text-lg font-bold text-white">AI 맞춤 추천 검색</h2>
           <p className="text-sm text-neutral-400 leading-relaxed">
-            OpenAI 1536차원 임베딩과 PostgreSQL pgvector를 결합하여 내 체형과 목표 시간에 꼭 맞는 장비와 레이스 전략을 실시간 스트리밍으로 추천합니다.
+            내 체형과 목표 시간에 꼭 맞는 장비와 레이스 전략을 맞춤형으로 추천받으세요!
           </p>
         </div>
       </section>

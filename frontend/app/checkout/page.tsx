@@ -42,14 +42,14 @@ export default function CheckoutPage() {
   const { items, getTotalAmount } = useCartStore();
 
   const [form, setForm] = useState<OrderFormState>({
-    ordererName: '김러너',
-    ordererPhone: '010-1234-5678',
-    ordererEmail: 'runner1@naver.com',
-    recipientName: '김러너',
-    recipientPhone: '010-1234-5678',
-    shippingAddress: '서울특별시 강남구 테헤란로 123',
-    shippingDetailAddress: '피터스웨트 타워 4층',
-    deliveryRequest: '부재 시 문 앞에 놓아주세요.',
+    ordererName: '',
+    ordererPhone: '',
+    ordererEmail: '',
+    recipientName: '',
+    recipientPhone: '',
+    shippingAddress: '',
+    shippingDetailAddress: '',
+    deliveryRequest: '',
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -454,7 +454,7 @@ export default function CheckoutPage() {
                   aria-label="주문자명"
                   value={form.ordererName}
                   onChange={handleInputChange}
-                  placeholder="홍길동"
+                  placeholder="성명 입력 (예: 홍길동)"
                   className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#FFD700] transition-colors"
                 />
               </div>
@@ -469,7 +469,7 @@ export default function CheckoutPage() {
                   aria-label="주문자 연락처"
                   value={form.ordererPhone}
                   onChange={handleInputChange}
-                  placeholder="010-1234-5678"
+                  placeholder="연락처 입력 (예: 010-1234-5678)"
                   className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#FFD700] transition-colors"
                 />
               </div>
@@ -484,7 +484,7 @@ export default function CheckoutPage() {
                   aria-label="주문자 이메일"
                   value={form.ordererEmail}
                   onChange={handleInputChange}
-                  placeholder="runner@example.com"
+                  placeholder="이메일 입력 (예: runner@example.com)"
                   className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#FFD700] transition-colors"
                 />
               </div>
@@ -510,7 +510,7 @@ export default function CheckoutPage() {
                   aria-label="수령인 이름"
                   value={form.recipientName}
                   onChange={handleInputChange}
-                  placeholder="수령인 이름"
+                  placeholder="수령인 성명 입력"
                   className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#FFD700] transition-colors"
                 />
               </div>
@@ -525,7 +525,7 @@ export default function CheckoutPage() {
                   aria-label="수령인 연락처"
                   value={form.recipientPhone}
                   onChange={handleInputChange}
-                  placeholder="010-1234-5678"
+                  placeholder="수령인 연락처 입력 (예: 010-1234-5678)"
                   className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#FFD700] transition-colors"
                 />
               </div>
@@ -543,7 +543,7 @@ export default function CheckoutPage() {
                   aria-label="배송지 기본 주소"
                   value={form.shippingAddress}
                   onChange={handleInputChange}
-                  placeholder="도로명 주소 입력"
+                  placeholder="기본 배송 주소 입력 (예: 서울특별시 서초구 강남대로 123)"
                   className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#FFD700] transition-colors"
                 />
                 <MapPin className="w-4 h-4 text-neutral-500 absolute right-3 top-3 pointer-events-none" />
@@ -561,7 +561,7 @@ export default function CheckoutPage() {
                 aria-label="상세 주소"
                 value={form.shippingDetailAddress}
                 onChange={handleInputChange}
-                placeholder="상세 주소 (동/호수, 층수 등)"
+                placeholder="상세 주소 입력 (동/호수, 층수 등)"
                 className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#FFD700] transition-colors"
               />
             </div>
@@ -577,7 +577,7 @@ export default function CheckoutPage() {
                 aria-label="배송 요청사항"
                 value={form.deliveryRequest}
                 onChange={handleInputChange}
-                placeholder="예: 부재 시 문 앞에 놓아주세요."
+                placeholder="배송 요청사항 입력 (예: 부재 시 문 앞에 놓아주세요)"
                 className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#FFD700] transition-colors"
               />
             </div>
