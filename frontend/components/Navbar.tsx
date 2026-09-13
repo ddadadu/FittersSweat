@@ -12,14 +12,19 @@ import {
   User,
   Menu,
   X,
+  LogIn,
+  LogOut,
 } from "lucide-react";
 import { useCartStore } from "@/stores/useCartStore";
+import { useAuthStore } from "@/stores/useAuthStore";
 
 export default function Navbar() {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
   const [isPulsing, setIsPulsing] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const { user, isAuthenticated, logout, setAuthModalOpen } = useAuthStore();
 
   // Subscribe to getItemCount() from useCartStore
   const itemCount = useCartStore((state) => {
@@ -147,18 +152,45 @@ export default function Navbar() {
             )}
           </Link>
 
-          {/* Desktop MyPage Link */}
-          <Link
-            href="/mypage"
-            className={`hidden md:flex items-center space-x-1.5 min-h-[44px] px-3.5 py-2 rounded-full border text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFD700] ${
-              isMypageActive
-                ? "border-[#FFD700] text-[#FFD700] bg-[#FFD700]/10"
-                : "border-[#333333] text-neutral-200 hover:border-[#FFD700] hover:text-[#FFD700]"
-            }`}
-          >
-            <User className="w-4 h-4" />
-            <span>마이페이지</span>
-          </Link>
+          {/* Desktop Auth State & MyPage Link */}
+          {mounted && (
+            isAuthenticated ? (
+              <div className="hidden md:flex items-center space-x-2">
+                <Link
+                  href="/mypage"
+                  className={`flex items-center space-x-1.5 min-h-[44px] px-3.5 py-2 rounded-full border text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFD700] ${
+                    isMypageActive
+                      ? "border-[#FFD700] text-[#FFD700] bg-[#FFD700]/10"
+                      : "border-[#333333] text-neutral-200 hover:border-[#FFD700] hover:text-[#FFD700]"
+                  }`}
+                >
+                  <User className="w-4 h-4 text-[#FFD700]" />
+                  <span className="font-bold">{user?.name || '러너'}</span>
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={() => logout()}
+                  className="min-h-[44px] px-3 py-2 text-xs font-medium text-neutral-400 hover:text-rose-400 transition-colors flex items-center space-x-1 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
+                  aria-label="로그아웃"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>로그아웃</span>
+                </button>
+              </div>
+            ) : (
+              <div className="hidden md:flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setAuthModalOpen(true, 'login')}
+                  className="min-h-[44px] px-3.5 py-2 rounded-full border border-[#FFD700] text-[#FFD700] hover:bg-[#FFD700] hover:text-black transition-all text-xs font-bold flex items-center space-x-1.5 shadow-sm shadow-[#FFD700]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFD700]"
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                  <span>로그인 / 회원가입</span>
+                </button>
+              </div>
+            )
+          )}
 
           {/* Mobile Hamburger Button */}
           <button
@@ -227,18 +259,59 @@ export default function Navbar() {
               )}
             </Link>
 
-            <Link
-              href="/mypage"
-              onClick={() => setMobileMenuOpen(false)}
-              className={`flex items-center space-x-3 px-4 py-3 min-h-[44px] rounded-xl text-sm font-semibold transition-colors ${
-                isMypageActive
-                  ? "bg-[#1F1F1F] text-[#FFD700] border-l-2 border-[#FFD700]"
-                  : "text-[#A3A3A3] hover:text-white hover:bg-[#141414]"
-              }`}
-            >
-              <User className="w-5 h-5" />
-              <span>마이페이지</span>
-            </Link>
+            {/* Mobile Auth Links */}
+            {mounted && (
+              isAuthenticated ? (
+                <>
+                  <div className="px-4 py-2 flex items-center space-x-3 text-xs text-neutral-400 bg-[#141414] rounded-xl border border-[#262626] my-1">
+                    <div className="w-8 h-8 rounded-full bg-[#1F1F1F] border border-[#FFD700]/40 flex items-center justify-center font-black text-[#FFD700] text-sm shrink-0">
+                      {(user?.name || 'R').slice(0, 1).toUpperCase()}
+                    </div>
+                    <div className="truncate min-w-0">
+                      <p className="font-bold text-white truncate">{user?.name || '러너'}</p>
+                      <p className="text-[11px] text-[#8A8A8A] truncate">{user?.email}</p>
+                    </div>
+                  </div>
+
+                  <Link
+                    href="/mypage"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center space-x-3 px-4 py-3 min-h-[44px] rounded-xl text-sm font-semibold transition-colors ${
+                      isMypageActive
+                        ? "bg-[#1F1F1F] text-[#FFD700] border-l-2 border-[#FFD700]"
+                        : "text-[#A3A3A3] hover:text-white hover:bg-[#141414]"
+                    }`}
+                  >
+                    <User className="w-5 h-5" />
+                    <span>마이페이지</span>
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      logout();
+                      setMobileMenuOpen(false);
+                    }}
+                    className="flex items-center space-x-3 px-4 py-3 min-h-[44px] rounded-xl text-sm font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors w-full text-left"
+                  >
+                    <LogOut className="w-5 h-5" />
+                    <span>로그아웃</span>
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthModalOpen(true, 'login');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="flex items-center justify-center space-x-2 px-4 py-3 min-h-[44px] rounded-xl text-sm font-bold bg-[#FFD700] hover:bg-yellow-400 text-black transition-colors w-full text-center my-1"
+                >
+                  <LogIn className="w-4 h-4" />
+                  <span>로그인 / 회원가입</span>
+                </button>
+              )
+            )}
           </div>
         </div>
       )}
