@@ -1,5 +1,7 @@
 import { PrismaClient, Role, EventStatus, OrderStatus } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import fs from 'fs';
+import path from 'path';
 
 const prisma = new PrismaClient();
 
@@ -83,58 +85,41 @@ async function main() {
     },
   });
 
-  // 5. 직매입 상품 데이터 생성 (AI RAG 검색의 소스가 될 상품들)
-  const product1 = await prisma.product.create({
-    data: {
-      name: 'PUMA Deviate NITRO 2 HYROX 공식 레이스화',
-      description: '카본 복합 플레이트와 나이트로 폼이 적용된 공식 HYROX 파트너 레이싱화. 런 앤 슬레드 푸시에서 뛰어난 접지력과 반발력을 제공합니다.',
-      categoryId: 'shoes',
-      price: 189000,
-      stockQuantity: 50,
-    },
+  // 5. 직매입 상품 데이터 생성 (400개 products.json 일괄 적재)
+  const productsJsonPath = path.join(__dirname, 'data/products.json');
+  const productsRaw = fs.readFileSync(productsJsonPath, 'utf-8');
+  const productsData: Array<{
+    name: string;
+    description: string;
+    categoryId: string;
+    price: number;
+    stockQuantity: number;
+    imageUrl?: string;
+    brandLogoUrl?: string;
+    detailImageUrl?: string;
+  }> = JSON.parse(productsRaw);
+
+  console.log(`📦 Seeding ${productsData.length} products from products.json...`);
+
+  await prisma.product.createMany({
+    data: productsData.map((p) => ({
+      name: p.name,
+      description: p.description,
+      categoryId: p.categoryId,
+      price: p.price,
+      stockQuantity: p.stockQuantity,
+      imageUrl: p.imageUrl,
+      brandLogoUrl: p.brandLogoUrl,
+      detailImageUrl: p.detailImageUrl,
+    })),
   });
 
-  const product2 = await prisma.product.create({
-    data: {
-      name: 'SIS 고탄수화물 에너지젤 (카페인 75mg 포함, 콜라맛)',
-      description: 'HYROX 8개 스테이션 사이사이 빠른 흡수로 젖산 축적을 막고 지구력을 유지해주는 고성능 에너지젤.',
-      categoryId: 'nutrition',
-      price: 3500,
-      stockQuantity: 500,
-    },
+  const seededProducts = await prisma.product.findMany({
+    take: 5,
+    orderBy: { id: 'asc' },
   });
 
-  const product3 = await prisma.product.create({
-    data: {
-      name: '스파이더 고장력 파머스 캐리 트레이닝 그립 장갑',
-      description: '케틀벨 캐리와 파머스 워크 시 손바닥 물집을 방지하고 악력을 보조하는 하이록스 맞춤형 가죽 그립.',
-      categoryId: 'gear',
-      price: 45000,
-      stockQuantity: 30,
-    },
-  });
-
-  const product4 = await prisma.product.create({
-    data: {
-      name: 'CEP 올라운드 종아리 컴프레션 슬리브 (카프가드)',
-      description: '1km 러닝 8회 반복 시 종아리 쥐와 근육 떨림을 방지해주는 단계적 압박 슬리브.',
-      categoryId: 'apparel',
-      price: 52000,
-      stockQuantity: 40,
-    },
-  });
-
-  const product5 = await prisma.product.create({
-    data: {
-      name: '포카리스웨트 이온 파우더 전해질 보충팩 (10포)',
-      description: '버피 브로드점프와 로잉머신 후 급격한 땀 손실 시 전해질 균형을 맞춰주는 분말 보충제.',
-      categoryId: 'nutrition',
-      price: 12000,
-      stockQuantity: 100,
-    },
-  });
-
-  console.log(`🛍️ Products seeded: 5 items`);
+  console.log(`🛍️ Products seeded successfully: ${productsData.length} items`);
 
   // 6. 커뮤니티 게시글 및 후기 (AI RAG 검색의 컨텍스트 소스)
   const post1 = await prisma.post.create({
@@ -165,36 +150,38 @@ async function main() {
   });
 
   // 8. 게시글 - 상품 태그 연결
-  await prisma.postProductTag.create({
-    data: {
-      postId: post1.id,
-      productId: product1.id,
-    },
-  });
+  if (seededProducts.length >= 3) {
+    await prisma.postProductTag.create({
+      data: {
+        postId: post1.id,
+        productId: seededProducts[0].id,
+      },
+    });
 
-  await prisma.postProductTag.create({
-    data: {
-      postId: post1.id,
-      productId: product2.id,
-    },
-  });
+    await prisma.postProductTag.create({
+      data: {
+        postId: post1.id,
+        productId: seededProducts[1].id,
+      },
+    });
 
-  await prisma.postProductTag.create({
-    data: {
-      postId: post2.id,
-      productId: product3.id,
-    },
-  });
+    await prisma.postProductTag.create({
+      data: {
+        postId: post2.id,
+        productId: seededProducts[2].id,
+      },
+    });
 
-  // 9. 실구매자 상품 리뷰
-  await prisma.review.create({
-    data: {
-      productId: product1.id,
-      userId: user1.id,
-      rating: 5,
-      content: '하이록스 공식 신발답게 트랙에서도 잘 달리고 슬레드 밀 때 접지력이 최고입니다.',
-    },
-  });
+    // 9. 실구매자 상품 리뷰
+    await prisma.review.create({
+      data: {
+        productId: seededProducts[0].id,
+        userId: user1.id,
+        rating: 5,
+        content: '하이록스 공식 신발답게 트랙에서도 잘 달리고 슬레드 밀 때 접지력이 최고입니다.',
+      },
+    });
+  }
 
   console.log('✅ Database seeding finished successfully!');
 }

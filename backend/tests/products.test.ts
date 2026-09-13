@@ -52,6 +52,52 @@ describe('Products API (/api/v1/products)', () => {
     }
   });
 
+  it('GET /api/v1/products?page=1&limit=10 - should paginate products correctly', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/products?page=1&limit=10',
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.payload);
+    expect(body.success).toBe(true);
+    expect(body.page).toBe(1);
+    expect(body.limit).toBe(10);
+    expect(body.total).toBe(400);
+    expect(body.totalPages).toBe(40);
+    expect(body.products.length).toBe(10);
+  });
+
+  it('GET /api/v1/products?search=PUMA - should search products by keyword', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/products?search=PUMA',
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.payload);
+    expect(body.success).toBe(true);
+    expect(body.products.length).toBeGreaterThan(0);
+    for (const p of body.products) {
+      const match = p.name.toUpperCase().includes('PUMA') || p.description.toUpperCase().includes('PUMA');
+      expect(match).toBe(true);
+    }
+  });
+
+  it('GET /api/v1/products?sort=price_asc - should sort products by price ascending', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/products?sort=price_asc&limit=10',
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.payload);
+    expect(body.success).toBe(true);
+    for (let i = 0; i < body.products.length - 1; i++) {
+      expect(body.products[i].price).toBeLessThanOrEqual(body.products[i + 1].price);
+    }
+  });
+
   it('GET /api/v1/products/:id - should return single product details with reviews', async () => {
     const res = await app.inject({
       method: 'GET',
