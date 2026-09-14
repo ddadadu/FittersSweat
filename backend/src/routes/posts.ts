@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { PrismaClient } from '@prisma/client';
+import { geminiService } from '../services/gemini.service';
 
 const prisma = new PrismaClient();
 
@@ -188,6 +189,19 @@ export async function postRoutes(app: FastifyInstance) {
           taggedItems: true,
         },
       });
+
+      // ponytail: background async vector embedding without blocking HTTP response
+      geminiService
+        .embedText(`${title} - ${content}`)
+        .then((embedding) => {
+          const vectorStr = `[${embedding.join(',')}]`;
+          return prisma.$executeRawUnsafe(
+            `UPDATE posts SET embedding = $1::vector WHERE id = $2`,
+            vectorStr,
+            post.id
+          );
+        })
+        .catch(() => {});
 
       return reply.status(201).send({
         success: true,

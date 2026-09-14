@@ -11,7 +11,8 @@
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:seed": "tsx prisma/seed.ts",
-    "db:seed:community": "tsx prisma/seed-community.ts"
+    "db:seed:community": "tsx prisma/seed-community.ts",
+    "db:embed": "tsx scripts/embed-catalog.ts"
   },
   "dependencies": {
     "@fastify/cors": "^8.4.0",
