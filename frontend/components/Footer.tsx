@@ -51,7 +51,7 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/search" className="hover:text-[#FFD700] transition-colors inline-flex items-center space-x-2 py-1.5 min-h-[36px]">
+                <Link href="/recommend" className="hover:text-[#FFD700] transition-colors inline-flex items-center space-x-2 py-1.5 min-h-[36px]">
                   <Sparkles className="w-3.5 h-3.5 text-[#FFD700]" />
                   <span>AI 맞춤추천</span>
                 </Link>
