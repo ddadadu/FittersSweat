@@ -73,7 +73,7 @@ export default function Navbar() {
     { href: "/events", label: "대회 일정", icon: Trophy },
     { href: "/products", label: "장비몰", icon: ShoppingBag },
     { href: "/community", label: "커뮤니티", icon: MessageSquare },
-    { href: "/search", label: "AI 맞춤추천", icon: Sparkles },
+    { href: "/recommend", label: "AI 맞춤추천", icon: Sparkles },
   ];
 
   const isRouteActive = (href: string) => {
