@@ -44,8 +44,8 @@ export class GeminiService {
    */
   async generateRecommendationAdvice(
     query: string,
-    products: Array<{ id: bigint | number; name: string; description?: string | null; categoryId: string; price: number | any }>,
-    posts: Array<{ id: bigint | number; title: string; content: string }>
+    products: Array<{ id: bigint | number | string; name: string; description?: string | null; categoryId?: string; price: number | any }>,
+    posts: Array<{ id: bigint | number | string; title: string; content: string }>
   ): Promise<string> {
     const prodSummary = products
       .map((p, i) => `${i + 1}. [${p.name}] (${p.categoryId}, ${Number(p.price).toLocaleString()}원): ${p.description || ''}`)
