@@ -83,7 +83,7 @@ model Product {
   imageUrl       String?          @map("image_url") @db.VarChar(500)
   brandLogoUrl   String?          @map("brand_logo_url") @db.VarChar(500)
   detailImageUrl String?          @map("detail_image_url") @db.VarChar(500)
-  embedding      Unsupported("vector(1536)")?
+  embedding      Unsupported("vector(768)")?
   createdAt     DateTime         @default(now()) @map("created_at")
   updatedAt     DateTime         @updatedAt @map("updated_at")
   orderItems    OrderItem[]
@@ -126,7 +126,7 @@ model Post {
   eventId      BigInt?          @map("event_id")
   title        String           @db.VarChar(255)
   content      String           @db.Text
-  embedding    Unsupported("vector(1536)")?
+  embedding    Unsupported("vector(768)")?
   createdAt    DateTime         @default(now()) @map("created_at")
   updatedAt    DateTime         @updatedAt @map("updated_at")
   user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
