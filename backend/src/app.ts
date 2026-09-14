@@ -10,6 +10,7 @@ import { productRoutes } from './routes/products';
 import { postRoutes } from './routes/posts';
 import { orderRoutes } from './routes/orders';
 import { aiRoutes } from './routes/ai';
+import { adminRoutes } from './routes/admin';
 
 dotenv.config();
 
@@ -84,6 +85,9 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // AI Recommendation Routes
   await app.register(aiRoutes, { prefix: '/api/v1/ai' });
+
+  // Admin Console Routes
+  await app.register(adminRoutes, { prefix: '/api/v1/admin' });
 
   return app;
 }

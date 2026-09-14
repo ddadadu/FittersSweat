@@ -14,6 +14,7 @@ import {
   X,
   LogIn,
   LogOut,
+  ShieldAlert,
 } from "lucide-react";
 import { useCartStore } from "@/stores/useCartStore";
 import { useAuthStore } from "@/stores/useAuthStore";
@@ -156,6 +157,20 @@ export default function Navbar() {
           {mounted && (
             isAuthenticated ? (
               <div className="hidden md:flex items-center space-x-2">
+                {user?.role === 'ADMIN' && (
+                  <Link
+                    href="/admin"
+                    className={`flex items-center space-x-1.5 min-h-[44px] px-3 py-2 rounded-full border text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
+                      pathname === '/admin'
+                        ? 'border-amber-400 text-amber-400 bg-amber-400/10'
+                        : 'border-amber-500/40 text-amber-400 hover:border-amber-400 hover:bg-amber-400/10'
+                    }`}
+                  >
+                    <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
+                    <span>관리자</span>
+                  </Link>
+                )}
+
                 <Link
                   href="/mypage"
                   className={`flex items-center space-x-1.5 min-h-[44px] px-3.5 py-2 rounded-full border text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFD700] ${
@@ -272,6 +287,21 @@ export default function Navbar() {
                       <p className="text-[11px] text-[#8A8A8A] truncate">{user?.email}</p>
                     </div>
                   </div>
+
+                  {user?.role === 'ADMIN' && (
+                    <Link
+                      href="/admin"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`flex items-center space-x-3 px-4 py-3 min-h-[44px] rounded-xl text-sm font-bold transition-colors ${
+                        pathname === '/admin'
+                          ? "bg-[#1F1F1F] text-amber-400 border-l-2 border-amber-400"
+                          : "text-amber-400 hover:text-amber-300 hover:bg-[#141414]"
+                      }`}
+                    >
+                      <ShieldAlert className="w-5 h-5 text-amber-400" />
+                      <span>관리자 대시보드</span>
+                    </Link>
+                  )}
 
                   <Link
                     href="/mypage"
