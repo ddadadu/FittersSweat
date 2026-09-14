@@ -201,7 +201,9 @@ export async function postRoutes(app: FastifyInstance) {
             post.id
           );
         })
-        .catch(() => {});
+        .catch((err) => {
+          app.log.error(err, `Failed to generate background embedding for post #${post.id}`);
+        });
 
       return reply.status(201).send({
         success: true,

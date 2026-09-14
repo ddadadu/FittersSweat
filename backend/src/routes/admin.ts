@@ -81,28 +81,40 @@ export async function adminRoutes(app: FastifyInstance) {
    * All orders with filters
    */
   app.get('/orders', { preHandler: [verifyAdmin] }, async (request, reply) => {
-    const { status } = request.query as { status?: string };
+    const { status, limit, page } = request.query as { status?: string; limit?: string; page?: string };
+
+    const take = limit ? Math.min(Math.max(Number(limit) || 50, 1), 100) : 50;
+    const skip = page ? ((Number(page) || 1) - 1) * take : 0;
 
     try {
-      const orders = await prisma.order.findMany({
-        where: status && status !== 'all' ? { status: status as OrderStatus } : undefined,
-        include: {
-          user: {
-            select: { id: true, name: true, email: true },
-          },
-          orderItems: {
-            include: {
-              product: {
-                select: { id: true, name: true, imageUrl: true, price: true, categoryId: true },
+      const where = status && status !== 'all' ? { status: status as OrderStatus } : undefined;
+      const [total, orders] = await Promise.all([
+        prisma.order.count({ where }),
+        prisma.order.findMany({
+          where,
+          take,
+          skip,
+          include: {
+            user: {
+              select: { id: true, name: true, email: true },
+            },
+            orderItems: {
+              include: {
+                product: {
+                  select: { id: true, name: true, imageUrl: true, price: true, categoryId: true },
+                },
               },
             },
           },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
+          orderBy: { createdAt: 'desc' },
+        }),
+      ]);
 
       return reply.send({
         success: true,
+        total,
+        page: page ? Number(page) : 1,
+        limit: take,
         orders: orders.map((o) => ({
           id: o.id.toString(),
           userId: o.userId.toString(),
@@ -179,7 +191,12 @@ export async function adminRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string };
     const { stockQuantity } = request.body as { stockQuantity: number };
 
-    if (typeof stockQuantity !== 'number' || stockQuantity < 0) {
+    if (
+      typeof stockQuantity !== 'number' ||
+      !Number.isFinite(stockQuantity) ||
+      !Number.isInteger(stockQuantity) ||
+      stockQuantity < 0
+    ) {
       return reply.status(400).send({ success: false, message: 'Invalid stock quantity' });
     }
 

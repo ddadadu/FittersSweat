@@ -277,8 +277,20 @@ export default function AdminPage() {
     }
   };
 
-  // Access Denied Screen for Non-Admin
-  if (!isLoading && !isAuthorized) {
+  // 1. Loading screen while verifying credentials (eliminates FOUC)
+  if (isLoading) {
+    return (
+      <main className="min-h-screen bg-[#0A0A0A] flex items-center justify-center p-4">
+        <div className="flex flex-col items-center space-y-3">
+          <Loader2 className="w-8 h-8 animate-spin text-[#FFD700]" />
+          <p className="text-xs text-neutral-400 font-medium">관리자 권한 확인 중...</p>
+        </div>
+      </main>
+    );
+  }
+
+  // 2. Access Denied Screen for Non-Admin
+  if (!isAuthorized) {
     return (
       <main className="min-h-screen bg-[#0A0A0A] flex items-center justify-center p-4">
         <div className="max-w-md w-full rounded-2xl bg-[#141414] border border-[#262626] p-8 text-center space-y-5">
