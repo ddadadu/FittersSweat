@@ -184,4 +184,25 @@ describe('Orders & Toss Payments API (/api/v1/orders)', () => {
     expect(Array.isArray(body.orders)).toBe(true);
     expect(body.orders.length).toBeGreaterThan(0);
   });
+
+  it('confirmTossPayment - handles real/mock Toss payments gracefully', async () => {
+    const { confirmTossPayment } = await import('../src/services/payment.service');
+    // Mock success test
+    const successRes = await confirmTossPayment({
+      paymentKey: 'test_mock_success_key',
+      orderId: 'ORDER_TEST_123',
+      amount: 15000,
+    });
+    expect(successRes.success).toBe(true);
+    expect(successRes.data?.status).toBe('DONE');
+
+    // Mock fail test
+    const failRes = await confirmTossPayment({
+      paymentKey: 'test_mock_fail_key',
+      orderId: 'ORDER_TEST_123',
+      amount: 15000,
+    });
+    expect(failRes.success).toBe(false);
+    expect(failRes.error).toBeDefined();
+  });
 });

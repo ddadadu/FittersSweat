@@ -16,7 +16,9 @@ export interface TossPaymentConfirmResponse {
 
 export async function confirmTossPayment(
   data: TossPaymentConfirmRequest,
-  secretKey = process.env.TOSS_SECRET_KEY || 'test_sk_dummy'
+  secretKey = (process.env.TOSS_SECRET_KEY && !process.env.TOSS_SECRET_KEY.includes('...'))
+    ? process.env.TOSS_SECRET_KEY
+    : 'test_sk_zXLkKEypNArWmo50nX3VQlmeAQyY'
 ): Promise<{ success: boolean; data?: TossPaymentConfirmResponse; error?: string }> {
   // Test mock handling for deterministic unit/integration testing
   if (data.paymentKey.includes('mock_fail')) {
