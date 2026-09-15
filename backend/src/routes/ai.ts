@@ -133,4 +133,149 @@ export async function aiRoutes(app: FastifyInstance) {
       });
     }
   });
+
+  /**
+   * POST /api/v1/ai/chat
+   * Rate-limited multi-turn conversational AI coach with LLM category intent routing,
+   * in-category pgvector search, and recursive query suggestion pills.
+   */
+  app.post(
+    '/chat',
+    {
+      config: {
+        rateLimit: {
+          max: 10,
+          timeWindow: '1 minute',
+          keyGenerator: (request: any) => {
+            const auth = request.headers.authorization;
+            if (auth && auth.startsWith('Bearer ')) {
+              try {
+                const decoded: any = app.jwt.decode(auth.slice(7));
+                if (decoded?.id) return `user-${decoded.id}`;
+              } catch {}
+            }
+            return request.ip;
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { query, history, currentCategory } = (request.body as {
+        query?: string;
+        history?: Array<{ role: string; content: string }>;
+        currentCategory?: string;
+      }) || {};
+
+      if (!query || !query.trim()) {
+        return reply.status(400).send({ success: false, message: 'Query is required' });
+      }
+
+      const q = query.trim();
+
+      try {
+        // 1. Parallel execution: Category intent classification + 768-dim query embedding
+        const [classification, queryVector] = await Promise.all([
+          geminiService.classifyQueryIntent(q, history?.slice(-5), currentCategory),
+          geminiService.embedText(q),
+        ]);
+
+        const vectorStr = `[${queryVector.join(',')}]`;
+        const targetCategory = classification.category;
+
+        // 2. In-Category Products Cosine Search
+        const rawProducts = await prisma.$queryRawUnsafe<RawProductMatch[]>(
+          `SELECT id, name, description, category_id, price, stock_quantity, image_url,
+                  (1 - (embedding <=> $1::vector))::float as similarity
+           FROM products
+           WHERE stock_quantity > 0
+             AND ($2::text = 'all' OR category_id = $2)
+             AND embedding IS NOT NULL
+           ORDER BY embedding <=> $1::vector ASC
+           LIMIT 6;`,
+          vectorStr,
+          targetCategory
+        );
+
+        // 3. Community Posts Cosine Search
+        const rawPosts = await prisma.$queryRawUnsafe<RawPostMatch[]>(
+          `SELECT p.id, p.title, p.content, p.user_id, u.name as user_name,
+                  (1 - (p.embedding <=> $1::vector))::float as similarity
+           FROM posts p
+           JOIN users u ON p.user_id = u.id
+           WHERE p.embedding IS NOT NULL
+           ORDER BY p.embedding <=> $1::vector ASC
+           LIMIT 4;`,
+          vectorStr
+        );
+
+        // 4. Cross-referencing: PostProductTag foreign key +20% boost
+        const postIds = rawPosts.map((p) => p.id);
+        const postTags = postIds.length > 0
+          ? await prisma.postProductTag.findMany({
+              where: { postId: { in: postIds } },
+              select: { postId: true, productId: true },
+            })
+          : [];
+
+        const taggedProductIds = new Set(postTags.map((pt) => pt.productId.toString()));
+
+        const rerankedProducts = rawProducts.map((p) => {
+          const isTagged = taggedProductIds.has(p.id.toString());
+          const score = isTagged ? p.similarity * 1.2 : p.similarity;
+          return {
+            id: p.id.toString(),
+            name: p.name,
+            description: p.description,
+            categoryId: p.category_id,
+            price: Number(p.price),
+            stockQuantity: p.stock_quantity,
+            imageUrl: p.image_url,
+            similarity: Number(p.similarity.toFixed(4)),
+            rerankScore: Number(score.toFixed(4)),
+            isSocialVerified: isTagged,
+          };
+        });
+
+        rerankedProducts.sort((a, b) => b.rerankScore - a.rerankScore);
+        const topProducts = rerankedProducts.slice(0, 3);
+
+        const topPosts = rawPosts.slice(0, 2).map((post) => ({
+          id: post.id.toString(),
+          title: post.title,
+          content: post.content,
+          userId: post.user_id.toString(),
+          userName: post.user_name,
+          similarity: Number(post.similarity.toFixed(4)),
+        }));
+
+        // 5. Generate conversational advice, follow-up question, and recursive suggestion pills
+        const chatRes = await geminiService.generateChatResponse(
+          q,
+          topProducts,
+          topPosts,
+          history?.slice(-5)
+        );
+
+        return reply.send({
+          success: true,
+          query: q,
+          detectedCategory: classification.category,
+          categoryReason: classification.reason,
+          advice: chatRes.advice,
+          followUpQuestion: chatRes.followUpQuestion,
+          suggestedQueries: chatRes.suggestedQueries,
+          recommendedProducts: topProducts,
+          verifiedReviews: topPosts,
+        });
+      } catch (err: any) {
+        app.log.error(err, 'Error generating AI chat response');
+        return reply.status(500).send({
+          success: false,
+          message: 'Failed to generate chat response',
+          error: err.message,
+        });
+      }
+    }
+  );
 }
+

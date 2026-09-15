@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import jwt from '@fastify/jwt';
+import rateLimit from '@fastify/rate-limit';
 import dotenv from 'dotenv';
 import { authRoutes } from './routes/auth';
 import { eventRoutes } from './routes/events';
@@ -57,6 +58,18 @@ export async function buildApp(): Promise<FastifyInstance> {
   // JWT
   await app.register(jwt, {
     secret: process.env.JWT_SECRET || 'fallback-secret-for-development-32chars',
+  });
+
+  // Rate Limiting (per-route configuration)
+  await app.register(rateLimit, {
+    global: false,
+    errorResponseBuilder: (_request, context) => ({
+      statusCode: 429,
+      error: 'Too Many Requests',
+      message: '매크로 방지를 위해 분당 메세지 제한이 설정되었습니다. 5회 경고 시 아이디가 영구 차단됩니다.',
+      max: context.max,
+      timeWindow: context.after,
+    }),
   });
 
   // Health check
