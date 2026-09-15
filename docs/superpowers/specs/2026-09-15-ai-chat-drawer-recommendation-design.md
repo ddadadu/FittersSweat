@@ -1,9 +1,9 @@
 # FittersSweat AI 기어 코치: 대화형 챗 드로어, Gemini 인텐트 분류 & 세션 지속성 설계 명세서 (PRD & Design Spec)
 
-> **문서 버전**: 2.0.0  
-> **작성일**: 2026-09-15  
-> **상태**: 사용자 QA 및 설계 확정 대기 (Draft)  
-> **적용 스택**: Next.js 14 + Tailwind CSS + Framer Motion + Zustand (LocalStorage Persist) + Fastify 4 + Google Gemini (`gemini-1.5-flash` JSON Mode + `text-embedding-004`) + PostgreSQL 18 `pgvector`
+> **문서 버전**: 2.1.0 (QA 및 설계 최종 확정본)  
+> **확정일**: 2026-09-15  
+> **상태**: 승인 완료 (Approved) ➔ 구현 계획서(writing-plans) 단계 진입  
+> **적용 스택**: Next.js 14 + Tailwind CSS + Framer Motion + Zustand (LocalStorage Persist) + Fastify 4 (`@fastify/rate-limit`) + Google Gemini (`gemini-1.5-flash` JSON Mode + `text-embedding-004`) + PostgreSQL 18 `pgvector`
 
 ---
 
@@ -20,7 +20,7 @@
 
 ---
 
-## 2. 제품 요구사항 및 비전 (Product Requirements)
+## 2. 제품 요구사항 및 확정 정책 (Product Requirements & Decisions)
 
 마이프로틴의 `Fuel Coach` 대화형 AI 인터페이스를 벤치마킹하여, FittersSweat의 감성에 맞는 **'Fit Coach (HYROX AI 기어 코치)'** 시스템을 구축합니다.
 
@@ -30,122 +30,124 @@
 │                                                                             │
 │  [Top Navbar]  대회일정   장비몰   커뮤니티   [⚡ AI 기어 코치]  장바구니    │
 ├───────────────────────┬─────────────────────────────────────────────────────┤
-│  [토글식 슬라이드 드로어]   │  [메인 화면] (/products, /events, /community 등)     │
+│  [좌측 슬라이드 드로어] │  [메인 화면] (/products, /events, /community 등)     │
 │  ┌─────────────────┐  │                                                     │
-│  │ ⚡ Fit Coach  [✕]│  │   8만 원 이상 무료배송 | 100% 본사 직매입 정품 보증 │
+│  │ ⚡ Fit Coach [✕]│  │   8만 원 이상 무료배송 | 100% 본사 직매입 정품 보증 │
 │  ├─────────────────┤  │                                                     │
-│  │ 🤖 어드바이저 답변│  │                                                     │
-│  │ [상품 카드 캐러셀] │  │                                                     │
-│  │                 │  │                                                     │
-│  │ "후반부 빠른 회복을│  │                                                     │
-│  │ 위한 전해질 음료도│  │                                                     │
-│  │ 함께 보실까요?" │  │                                                     │
-│  │                 │  │                                                     │
-│  │ [재귀 질문 칩들] │  │                                                     │
-│  │ [전해질 이온 음료]│  │                                                     │
-│  │ [위장편한 젤]    │  │                                                     │
+│  │ 1. 미니 기어 캐러셀│  │                                                     │
+│  │   [젤] [신발] [기어]│  │                                                     │
+│  │ 2. AI 소견(500자) │  │                                                     │
+│  │ 3. 후기 아코디언  │  │                                                     │
+│  │ 4. 재귀 칩 3~4개  │  │                                                     │
 │  ├─────────────────┤  │                                                     │
 │  │ [💬 질문 입력...] │  │                                  [⚡ AI 코치 FAB] │
 │  └─────────────────┘  │                                     (모바일/데스크톱)│
 └───────────────────────┴─────────────────────────────────────────────────────┘
 ```
 
-### 2.1 핵심 4대 요구사항
-1. **Gemini 1.5 Flash 기반 지능형 카테고리 의도(Category Intent) 분류**:
-   - 하드코딩 정규식이 아닌 LLM이 질의의 진짜 구매 대상을 `nutrition | shoes | gear | equipment | all`로 200ms 내 분류.
-   - 분류된 카테고리 내에서만 pgvector 코사인 검색을 수행하여 오매칭을 원천 차단.
-2. **토글식 대화형 채팅 드로어 (Slide-over Chat Drawer)**:
-   - 화면 좌측(또는 우측)에서 부드럽게 열리고 닫히는 반응형 토글 인터페이스.
-   - 상단 네비바 버튼 및 전역 플로팅 액션 버튼(FAB)을 통해 어느 페이지에서든 즉시 오픈.
-3. **새로고침 및 페이지 이동에도 유지되는 세션 지속성 (Session Persistence)**:
-   - Zustand + `localStorage` 기반 대화 기록(`messages`) 및 열림 상태(`isOpen`) 영구 보존.
-   - 장비몰을 둘러보며 추천받은 젤을 확인하고 장바구니에 담아도 대화 맥락이 끊기지 않음.
-4. **맥락 기반 재귀 질문(Follow-up) 및 1탭 후속 질문 칩**:
-   - AI 답변 말미에 레이서의 다음 행동을 유도하는 맞춤 질문 제시.
-   - 3~4개의 재귀 추천 칩(`[단백질 보충제]`, `[전해질 이온음료]`, `[위장 트러블 방지 팁]` 등)을 원탭 클릭 시 즉시 후속 질의 전송.
+### 2.1 사용자 QA를 통해 최종 확정된 6대 핵심 정책
+
+1. **드로어 UI 위치: 좌측(Left) 슬라이드 드로어 (확정: A안)**
+   - 마이프로틴 레퍼런스와 동일하게 화면 좌측에서 오버레이 형태로 스르륵 열림 (데스크톱 너비 400px 고정, 모바일 100vw).
+   - 우측의 쇼핑몰 상품 목록과 커뮤니티 글을 탐색하면서 동시에 AI 코치와 자연스럽게 대화 가능.
+2. **페이지 연동: 일관된 드로어 모드 (확정: A안)**
+   - 상단 네비바의 [AI 맞춤추천] 클릭 시 페이지 이동 없이 현재 화면에서 좌측 챗 드로어가 오픈.
+   - `/recommend` URL로 직접 진입 시에도 메인 화면 위에서 좌측 챗 드로어가 자동 오픈되어 일관된 경험 제공.
+3. **슬라이딩 윈도우 (Sliding Window)**
+   - 브라우저 로컬스토리지에는 사용자가 스크롤하여 확인할 수 있도록 전체 대화 내역을 보존하되, **백엔드 API 요청 시에는 최근 5개 메시지(`history.slice(-5)`)만 전송**하여 전송 페이로드와 토큰 낭비를 차단하고 0.5초대 초고속 응답 유지.
+4. **악의적 매크로 & 쿼터 3단계 방어 체계**
+   - **1단계 (속도 제한)**: `@fastify/rate-limit` 기반 분당 10회 제한. (비회원은 IP 기준, 회원은 JWT `user.id` 기준 분당 10회 적용). 429 에러 반환 시 드로어 내에 `"매크로 방지를 위해 분당 메세지 제한이 설정되었습니다. 5회 경고 시 아이디가 영구 차단됩니다. (경고 {count}/5회)"` 경고 배너 노출.
+   - **2단계 (하이브리드 티저 쿼터)**: 비회원은 10회 무료 대화 제공 후 1초 간편 로그인 모달 유도(그로스해킹), 로그인 회원은 일일 100회 쿼터 제공.
+   - **3단계 (토큰 캡)**: Gemini 1.5 Flash에 `maxOutputTokens: 500`을 강제 적용하여 AI 소견 텍스트 출력을 500자 이내로 제한.
+5. **점진적 공개 (Progressive Disclosure) 3단 컴포넌트 UI**
+   - **상단**: 1:1 정사각 **미니 기어 3선 스냅 카드 (120px)** + 1탭 장바구니 담기.
+   - **중단**: **AI 수석 피터 소견 (최대 500자, 약 5~7문장)**.
+   - **하단**: **실전 후기 인라인 아코디언 배지** (클릭 시 2줄 핵심 팁 스르륵 펼쳐짐, 페이지 이탈 없음).
+   - **최하단**: **후속 유도 질문 & 3~4개 1탭 재귀 질문 칩 (`suggestedQueries`)**.
+   - 결과 높이: 기존 수직 나열 시 900px ➔ **약 380px로 55% 압축**되어 모바일 한 화면에 완벽 수납.
+6. **세션 지속성 (Session Persistence)**
+   - Zustand `persist` (`localStorage`) 기반으로 페이지 이동(`/products`, `/events`, `/community`) 및 브라우저 새로고침(F5) 시에도 대화 기록 및 드로어 상태 100% 보존.
 
 ---
 
-## 3. 상세 아키텍처 및 파이프라인
+## 3. 백엔드 상세 아키텍처 및 파이프라인
 
-### 3.1 백엔드 4단계 검색·추론 파이프라인
+### 3.1 백엔드 4단계 검색·추론 시퀀스
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor User as 레이서 (사용자)
     participant Client as Frontend (Chat Drawer)
+    participant RateLimit as Fastify Rate Limit
     participant API as Fastify Backend (/api/v1/ai/chat)
     participant Gemini as Google Gemini 1.5 Flash
     participant PG as PostgreSQL 18 (pgvector)
     
     User->>Client: "후반 버피와 런에서 쥐 안 나고 즉각 흡수되는 에너지젤 추천해줘"
-    Client->>API: POST /api/v1/ai/chat (query, history)
+    Client->>RateLimit: POST /api/v1/ai/chat (query, history[-5], currentCategory)
     
-    Note over API,Gemini: Step 1: 질의 의도(Category Intent) 분류 (JSON Mode)
-    API->>Gemini: classifyQueryIntent(query, history)
-    Gemini-->>API: { category: "nutrition", confidence: 0.98, station: "burpee/run" }
-    
-    Note over API,PG: Step 2: 768차원 임베딩 & 카테고리 내 코사인 검색
-    API->>Gemini: embedText(query) (text-embedding-004)
-    Gemini-->>API: 768-dim vector
-    API->>PG: SELECT products WHERE category_id = 'nutrition' ORDER BY embedding <=> query LIMIT 6
-    API->>PG: SELECT posts ORDER BY embedding <=> query LIMIT 3
-    PG-->>API: nutrition 상품군 및 연관 완주 후기 반환 (신발/테이프 원천 배제)
-    
-    Note over API,Gemini: Step 3: 어드바이저 처방, 후속 질문 및 재귀 질문 칩 생성
-    API->>Gemini: generateChatResponse(query, products, posts, history)
-    Gemini-->>API: { advice, followUpQuestion, suggestedQueries: ["전해질 음료", "위장편한 젤", "BCAA"] }
-    
-    API-->>Client: 200 OK (detectedCategory, products, posts, advice, followUpQuestion, suggestedQueries)
-    Client-->>User: 채팅 버블 렌더링 + 상품 캐러셀 + 재귀 질문 칩 노출
+    alt 분당 10회 초과 시
+        RateLimit-->>Client: 429 Too Many Requests ("매크로 방지 경고...")
+    else 통과 시
+        RateLimit->>API: 핸들러 실행
+        
+        Note over API,Gemini: Step 1: 질의 의도 분류 & 768차원 임베딩 병렬 실행 (Promise.all)
+        par 의도 분류
+            API->>Gemini: classifyQueryIntent(query, history[-5], currentCategory)
+            Gemini-->>API: { category: "nutrition", reason: "에너지젤 구매 의도" }
+        and 텍스트 임베딩
+            API->>Gemini: embedText(query) (text-embedding-004)
+            Gemini-->>API: 768-dim vector
+        end
+        
+        Note over API,PG: Step 2: 카테고리 내 코사인 검색 (WHERE category_id = 'nutrition')
+        API->>PG: SELECT products WHERE category_id = 'nutrition' ORDER BY embedding <=> query LIMIT 6
+        API->>PG: SELECT posts ORDER BY embedding <=> query LIMIT 3
+        PG-->>API: nutrition 상품군 및 연관 후기 반환 (신발/테이프 원천 배제)
+        
+        Note over API,Gemini: Step 3: AI 처방, 후속 질문, 재귀 질문 칩 생성 (maxOutputTokens: 500)
+        API->>Gemini: generateChatResponse(query, products, posts, history)
+        Gemini-->>API: { advice (500자), followUpQuestion, suggestedQueries: ["전해질 타블렛", "BCAA", ...] }
+        
+        API-->>Client: 200 OK (detectedCategory, products, posts, advice, followUpQuestion, suggestedQueries)
+        Client-->>User: 120px 미니 카드 + 500자 소견 + 후기 아코디언 + 재귀 칩 렌더링
+    end
 ```
 
 ---
 
-## 4. 백엔드 상세 변경 명세
+## 4. 백엔드 컴포넌트 및 API 명세
 
-### 4.1 신규 AI 챗 서비스 메서드 (`backend/src/services/gemini.service.ts`)
+### 4.1 신규 AI 메서드 (`backend/src/services/gemini.service.ts`)
 
-#### 1) `classifyQueryIntent(query: string, history?: ChatHistoryItem[]): Promise<CategoryClassification>`
-- **모델**: `gemini-1.5-flash`
-- **설정**: `responseMimeType: "application/json"`
-- **시스템 지침**:
-  ```
-  당신은 HYROX 피트니스 이커머스 전문 질의 분류기입니다.
-  사용자의 문장에서 맥락(훈련 스테이션, 통증)과 실제 구매하려는 목표 제품군을 정확히 분리하세요.
-  
-  카테고리 규격:
-  - "shoes": 러닝화, 카본화, 접지화, 베어풋 슈즈 등 신발
-  - "nutrition": 에너지젤, 아미노산, 단백질, 전해질, 마그네슘, 스포츠음료, 회복 보충제
-  - "gear": 무릎 슬리브, 짐내스틱 그립, 리프팅 스트랩, 테이핑, 양말, 장갑 등 착용 기어
-  - "equipment": 슬레드, 케틀벨, 월볼, 덤벨, 인조잔디 매트, 스키에르그 등 훈련 기구
-  - "all": 풀세트 추천, 하이록스 입문 필수템, 종합 레이스 패키지 등 다중 카테고리 질의
-  ```
-- **Mock / Fallback**: API 장애나 키 미설정 시 정규식 키워드(젤/단백질 ➔ nutrition, 신발/러너 ➔ shoes 등)로 0ms 즉시 대체.
+#### 1) `classifyQueryIntent(query: string, history?: ChatHistoryItem[], currentCategory?: string): Promise<CategoryClassification>`
+- 모델: `gemini-1.5-flash` (JSON Mode)
+- 프롬프트 규칙:
+  - 새 카테고리 단어(신발, 슬리브, 젤 등) 등장 시 즉시 카테고리 전환.
+  - 생략형 질문("카페인 없는 건?", "와이드 핏은?") 시 `currentCategory` 맥락 계승.
+  - 종합 질문("풀세트 맞춰줘") 시 `all` 반환.
+- Fallback: 키 미설정/에러 시 0ms 정규식 키워드 감지 적용.
 
-#### 2) `generateChatResponse(...)`: 재귀 질문 및 후속 칩 생성
+#### 2) `generateChatResponse(query, products, posts, history): Promise<ChatAdvisorResponse>`
+- `maxOutputTokens: 500` 강제 설정.
 - 반환 JSON 스키마:
   ```typescript
   interface ChatAdvisorResponse {
-    advice: string;            // 마크다운 형식의 1:1 레이서 맞춤 처방
-    followUpQuestion: string;  // 대화를 이끌어갈 레이서 맞춤형 후속 유도 질문
-    suggestedQueries: string[]; // 클릭 시 다음 질문으로 전송될 3~4개의 재귀 추천 칩
+    advice: string;            // 500자 이내 마크다운 피팅 소견
+    followUpQuestion: string;  // 대화 유도형 후속 질문 1문장
+    suggestedQueries: string[]; // 1탭 클릭용 재귀 질문 칩 3~4개
   }
   ```
 
-### 4.2 백엔드 API 엔드포인트 (`backend/src/routes/ai.ts`)
-
-- **엔드포인트**: `POST /api/v1/ai/chat` (기존 `/recommend` 하위 호환 유지)
+### 4.2 API 엔드포인트 (`POST /api/v1/ai/chat`)
+- **Fastify Rate Limit**: `max: 10, timeWindow: '1 minute'` (IP or User ID key)
 - **Request Body**:
   ```typescript
   interface ChatRequest {
     query: string;
-    history?: Array<{
-      role: 'user' | 'assistant';
-      content: string;
-    }>;
-    categoryId?: string; // 사용자가 수동 선택한 경우 우선 적용
+    history?: Array<{ role: 'user' | 'assistant'; content: string }>; // 최근 5개
+    currentCategory?: string;
   }
   ```
 - **Response Body**:
@@ -181,70 +183,70 @@ sequenceDiagram
 
 ---
 
-## 5. 프론트엔드 UI/UX 상세 설계
+## 5. 프론트엔드 UI/UX 컴포넌트 상세 설계
 
-### 5.1 컴포넌트 아키텍처
+### 5.1 파일 구조
 
 ```
 frontend/
 ├── stores/
-│   └── useAiChatStore.ts      # [NEW] Zustand + persist (대화 히스토리, isOpen, 세션 관리)
+│   └── useAiChatStore.ts         # Zustand + LocalStorage persist (메시지, isOpen, 쿼터 카운트)
 ├── components/
 │   ├── ai/
-│   │   ├── AiCoachDrawer.tsx  # [NEW] 토글식 좌/우 슬라이드 드로어 컨테이너 (Framer Motion)
-│   │   ├── ChatMessageBubble.tsx # [NEW] 텍스트 + 상품 카드 캐러셀 + 후기 인용구 렌더러
-│   │   ├── ProductMiniCarousel.tsx # [NEW] 드로어 내부 1:1 정사각 썸네일 & 1탭 장바구니 상품 카드
-│   │   └── SuggestedQueryPills.tsx # [NEW] 재귀 질문 칩 리스트 (가로 스크롤 및 1탭 전송)
-│   ├── AiCoachFab.tsx         # [NEW] 전역 우측 하단 플로팅 토글 버튼 (배지 포함)
-│   └── Navbar.tsx             # [MODIFY] "AI 맞춤추천" 클릭 시 드로어 토글 열기 연동
+│   │   ├── AiCoachDrawer.tsx     # 좌측 슬라이드 드로어 (Framer Motion slide-in from left)
+│   │   ├── ChatMessageBubble.tsx # 메시지 버블 (상단 미니 카드 + 소견 + 후기 아코디언 + 재귀 칩)
+│   │   ├── MiniProductCard.tsx   # 120px 높이 1:1 썸네일 & 1탭 장바구니 미니 카드
+│   │   ├── ReviewAccordion.tsx   # 인라인 아코디언 완주 후기 팁 배지
+│   │   └── RecursiveQueryPills.tsx # 1탭 재귀 질문 칩 버튼 리스트
+│   ├── AiCoachFab.tsx            # 전역 우측 하단 플로팅 토글 버튼 (골드 펄스 배지)
+│   └── Navbar.tsx                # "AI 맞춤추천" 클릭 시 드로어 토글 연동
 └── app/
-    └── recommend/page.tsx     # [MODIFY] 드로어가 열린 전용 뷰 제공 또는 드로어와의 심리스 연계
+    └── recommend/page.tsx        # /recommend 진입 시 드로어가 자동 열린 상태로 마운트
 ```
 
-### 5.2 Zustand 영구 스토어 (`useAiChatStore.ts`)
-- **저장소**: `localStorage` (`name: 'fittersweat-ai-coach-session'`)
-- **상태 정의**:
-  - `isOpen: boolean`: 드로어 노출 여부
-  - `messages: ChatMessage[]`: 주고받은 전체 대화 내역 (시간, 역할, 텍스트, 추천 상품, 재귀 질문 칩 등)
-  - `isLoading: boolean`: 답변 생성 중 로딩 상태
-  - `actions`: `toggleOpen()`, `sendMessage(query)`, `clearSession()`, `feedbackMessage(id, type)`
+### 5.2 Zustand 스토어 명세 (`useAiChatStore.ts`)
+```typescript
+interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  detectedCategory?: string;
+  products?: RecommendedProduct[];
+  reviews?: VerifiedReview[];
+  followUpQuestion?: string;
+  suggestedQueries?: string[];
+  createdAt: number;
+}
 
-### 5.3 Dark Athletic 디자인 시스템 준수 (`ui-ux-pro-max`)
-- **배경 및 서피스**: 드로어 배경 `#141414`, 보더 `#262626`, 글래스모피즘 `backdrop-blur-md`
-- **포인트 컬러**: 브랜드 시그니처 골드 `#FFD700`, 라임 `#CCFF00`, 텍스트 화이트 `#FFFFFF`
-- **터치 타겟**: 재귀 질문 알약 칩, 장바구니 버튼, 닫기 버튼 모두 최소 **44x44px** 확보
-- **키보드 접근성**: `Escape` 키 입력 시 드로어 닫기, `Enter` 키로 메시지 전송, 명확한 `focus-visible:ring-2`
+interface AiChatState {
+  isOpen: boolean;
+  messages: ChatMessage[];
+  currentCategory: string;
+  isLoading: boolean;
+  warningCount: number; // 5회 초과 시 차단
+  isBanned: boolean;
+  guestQueryCount: number; // 비회원 10회 제한
+  
+  toggleOpen: () => void;
+  setOpen: (open: boolean) => void;
+  sendMessage: (query: string) => Promise<void>;
+  resetConversation: () => void;
+}
+```
 
 ---
 
 ## 6. E2E 테스트 및 검증 시나리오
 
-1. **시나리오 1: 에너지젤 의도 분류 검증 (오매칭 차단)**
-   - 입력: `"후반 버피와 런에서 쥐 안 나고 즉각 흡수되는 카페인 전해질 에너지젤 추천해줘"`
-   - 검증:
-     - `detectedCategory`가 `'nutrition'`으로 판별됨.
-     - 응답된 `recommendedProducts` 3개 상품의 `categoryId`가 모두 `'nutrition'`임 (러닝화, 테이프 0건).
-2. **시나리오 2: 재귀 질문(Follow-up) 인터랙션 검증**
-   - 검증: 답변 하단에 `followUpQuestion` 텍스트와 3~4개의 `suggestedQueries` 알약 칩 노출.
-   - 동작: 사용자가 `[전해질 이온 음료]` 칩 클릭 ➔ 입력창 입력 없이 즉시 다음 질문으로 전송 및 2차 맞춤 답변 수신.
-3. **시나리오 3: 세션 지속성(Session Persistence) 검증**
-   - 대화 진행 후 브라우저 새로고침(F5) ➔ 이전 대화 내역 및 스크롤 위치 유지.
-   - 드로어를 연 상태에서 `/products` 또는 `/community`로 라우팅 ➔ 드로어 상태 및 대화 내역 온전히 유지.
-   - [새 대화 시작] 버튼 클릭 시 대화 내역 초기화 및 안내 메시지 재출력.
-4. **시나리오 4: 1탭 커머스 연동 검증**
-   - 드로어 내 추천 상품 카드에서 [장바구니 담기] 클릭 ➔ 네비바 카운터 즉시 +1 반영 및 토스트 안내.
-
----
-
-## 7. 설계 검토 및 사용자 QA 질의 (Clarification Questions)
-
-구현을 시작하기 전, 최상의 사용자 경험을 위해 다음 3가지 결정 사항에 대한 의견을 확인하고자 합니다:
-
-1. **드로어 UI 위치**:
-   - **(권장) 좌측 슬라이드 드로어 (마이프로틴 스타일)**: 좌측에 고정되어 우측의 쇼핑몰/커뮤니티 상품을 둘러보며 대화하기 용이함.
-   - **우측 슬라이드 드로어**: 일반적인 웹 챗봇 표준 위치.
-2. **기존 `/recommend` 페이지와의 관계**:
-   - **(권장) `/recommend` 방문 시 드로어가 활성화된 전용 모드로 렌더링**: 모바일/데스크톱 모두 일관된 챗 경험 제공.
-   - **`/recommend`는 전체 화면 채팅 뷰로 유지하고, 드로어는 타 페이지(`/products`, `/events`)에서만 열림**.
-3. **멀티턴 대화 시 카테고리 유지 정책**:
-   - 사용자가 1차로 "에너지젤"을 물어본 뒤, 2차로 "카페인 없는 건?"이라고 짧게 물었을 때, 이전 맥락(`nutrition`)을 그대로 유지하여 카페인 없는 에너지젤을 검색하도록 히스토리를 유지할까요? (권장: **예, 이전 카테고리 맥락 계승**)
+1. **시나리오 1: 에너지젤 의도 분류 & 카테고리 격리 검증**
+   - 질의: `"후반 버피와 런에서 쥐 안 나고 즉각 흡수되는 에너지젤 추천해줘"`
+   - 검증: `detectedCategory: 'nutrition'`, 반환된 3개 상품의 `categoryId`가 모두 `'nutrition'` (러닝화, 테이프 0건).
+2. **시나리오 2: 재귀 질문 칩 클릭 인터랙션 검증**
+   - 검증: 응답 하단에 3~4개의 재귀 추천 칩 노출.
+   - 동작: 사용자가 `[전해질 타블렛]` 클릭 ➔ 타이핑 없이 즉시 2차 질의 전송 및 영양제 맥락 유지 답변 수신.
+3. **시나리오 3: 세션 지속성 (Navigation & Reload Persistence)**
+   - 대화 진행 ➔ 페이지 이동(`/products`) ➔ 좌측 드로어 열림 상태 및 이전 대화 유지.
+   - 브라우저 새로고침(F5) ➔ 이전 대화 내역 및 스크롤 위치 유지.
+4. **시나리오 4: 매크로 방어 및 비회원 티저 쿼터 검증**
+   - 1분 내 11회 연타 ➔ HTTP 429 에러 및 경고 배너 노출.
+   - 비회원 10회 대화 초과 ➔ 1초 간편 로그인 모달 팝업 노출 및 입력창 잠금.
