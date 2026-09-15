@@ -3,6 +3,8 @@ import './globals.css';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import Providers from '@/components/Providers';
+import { AiCoachDrawer } from '@/components/ai/AiCoachDrawer';
+import { AiCoachFab } from '@/components/ai/AiCoachFab';
 
 export const metadata: Metadata = {
   title: 'FitterSweat - 국내 1위 HYROX 커뮤니티 커머스 & AI 추천',
@@ -23,6 +25,8 @@ export default function RootLayout({
             {children}
           </main>
           <Footer />
+          <AiCoachDrawer />
+          <AiCoachFab />
         </Providers>
       </body>
     </html>

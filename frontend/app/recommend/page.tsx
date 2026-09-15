@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
@@ -16,6 +16,7 @@ import {
   Trophy,
 } from 'lucide-react';
 import { useCartStore } from '@/stores/useCartStore';
+import { useAiChatStore } from '@/stores/useAiChatStore';
 
 interface RecommendedProduct {
   id: string;
@@ -78,10 +79,20 @@ export default function RecommendPage() {
   const [addedProductId, setAddedProductId] = useState<string | null>(null);
 
   const addItem = useCartStore((state) => state.addItem);
+  const setDrawerOpen = useAiChatStore((state) => state.setOpen);
+  const sendChatMessage = useAiChatStore((state) => state.sendMessage);
+
+  // Auto-open AI Coach Drawer on mount when visiting /recommend
+  useEffect(() => {
+    setDrawerOpen(true);
+  }, [setDrawerOpen]);
 
   const handleSearch = async (targetQuery?: string) => {
     const q = (targetQuery !== undefined ? targetQuery : query).trim();
     if (!q) return;
+
+    setDrawerOpen(true);
+    sendChatMessage(q);
 
     setIsLoading(true);
     setError(null);

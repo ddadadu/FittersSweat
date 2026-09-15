@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useCartStore } from "@/stores/useCartStore";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { useAiChatStore } from "@/stores/useAiChatStore";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -112,6 +113,12 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
+                onClick={(e) => {
+                  if (link.href === '/recommend') {
+                    e.preventDefault();
+                    useAiChatStore.getState().toggleOpen();
+                  }
+                }}
                 className={`relative h-16 flex items-center space-x-1.5 px-3 text-sm font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFD700] ${
                   active
                     ? "text-[#FFD700]"
@@ -239,7 +246,13 @@ export default function Navbar() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  onClick={() => setMobileMenuOpen(false)}
+                  onClick={(e) => {
+                    setMobileMenuOpen(false);
+                    if (link.href === '/recommend') {
+                      e.preventDefault();
+                      useAiChatStore.getState().toggleOpen();
+                    }
+                  }}
                   className={`flex items-center space-x-3 px-4 py-3 min-h-[44px] rounded-xl text-sm font-semibold transition-colors ${
                     active
                       ? "bg-[#1F1F1F] text-[#FFD700] border-l-2 border-[#FFD700]"
