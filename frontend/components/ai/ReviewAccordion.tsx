@@ -55,6 +55,7 @@ export function ReviewAccordion({ review }: ReviewAccordionProps) {
                 href={`/community/${review.id}`}
                 target="_blank"
                 rel="noopener noreferrer"
+                aria-label="원문 후기 보기 (새 창에서 열림)"
                 className="inline-flex items-center space-x-1 text-[#FFD700] hover:underline"
               >
                 <span>원문 후기 보기</span>

@@ -150,7 +150,7 @@ export async function aiRoutes(app: FastifyInstance) {
             const auth = request.headers.authorization;
             if (auth && auth.startsWith('Bearer ')) {
               try {
-                const decoded: any = app.jwt.decode(auth.slice(7));
+                const decoded = app.jwt.verify<{ id: string | number }>(auth.slice(7));
                 if (decoded?.id) return `user-${decoded.id}`;
               } catch {}
             }
@@ -166,16 +166,23 @@ export async function aiRoutes(app: FastifyInstance) {
         currentCategory?: string;
       }) || {};
 
-      if (!query || !query.trim()) {
+      if (!query || typeof query !== 'string' || !query.trim()) {
         return reply.status(400).send({ success: false, message: 'Query is required' });
       }
 
+      if (query.length > 500) {
+        return reply.status(400).send({ success: false, message: 'Query must not exceed 500 characters' });
+      }
+
       const q = query.trim();
+      const safeHistory = Array.isArray(history)
+        ? history.slice(-5).filter((h) => h && typeof h.role === 'string' && typeof h.content === 'string')
+        : [];
 
       try {
         // 1. Parallel execution: Category intent classification + 768-dim query embedding
         const [classification, queryVector] = await Promise.all([
-          geminiService.classifyQueryIntent(q, history?.slice(-5), currentCategory),
+          geminiService.classifyQueryIntent(q, safeHistory, currentCategory),
           geminiService.embedText(q),
         ]);
 
@@ -183,7 +190,7 @@ export async function aiRoutes(app: FastifyInstance) {
         const targetCategory = classification.category;
 
         // 2. In-Category Products Cosine Search
-        const rawProducts = await prisma.$queryRawUnsafe<RawProductMatch[]>(
+        let rawProducts = await prisma.$queryRawUnsafe<RawProductMatch[]>(
           `SELECT id, name, description, category_id, price, stock_quantity, image_url,
                   (1 - (embedding <=> $1::vector))::float as similarity
            FROM products
@@ -195,6 +202,28 @@ export async function aiRoutes(app: FastifyInstance) {
           vectorStr,
           targetCategory
         );
+
+        // Fallback to all categories if fewer than 3 items found in isolated category
+        if (targetCategory !== 'all' && rawProducts.length < 3) {
+          const fallbackProducts = await prisma.$queryRawUnsafe<RawProductMatch[]>(
+            `SELECT id, name, description, category_id, price, stock_quantity, image_url,
+                    (1 - (embedding <=> $1::vector))::float as similarity
+             FROM products
+             WHERE stock_quantity > 0
+               AND embedding IS NOT NULL
+             ORDER BY embedding <=> $1::vector ASC
+             LIMIT 6;`,
+            vectorStr
+          );
+          const existingIds = new Set(rawProducts.map((p) => p.id));
+          for (const fb of fallbackProducts) {
+            if (!existingIds.has(fb.id)) {
+              rawProducts.push(fb);
+              existingIds.add(fb.id);
+            }
+            if (rawProducts.length >= 6) break;
+          }
+        }
 
         // 3. Community Posts Cosine Search
         const rawPosts = await prisma.$queryRawUnsafe<RawPostMatch[]>(
@@ -253,7 +282,7 @@ export async function aiRoutes(app: FastifyInstance) {
           q,
           topProducts,
           topPosts,
-          history?.slice(-5)
+          safeHistory
         );
 
         return reply.send({

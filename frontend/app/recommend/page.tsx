@@ -93,30 +93,6 @@ export default function RecommendPage() {
 
     setDrawerOpen(true);
     sendChatMessage(q);
-
-    setIsLoading(true);
-    setError(null);
-
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
-    try {
-      const res = await fetch(`${apiUrl}/api/v1/ai/recommend`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q }),
-      });
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || '추천 분석 중 오류가 발생했습니다.');
-      }
-
-      setResult(data);
-    } catch (err: any) {
-      setError(err.message || '네트워크 연결 오류가 발생했습니다.');
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   const handleAddToCart = (product: RecommendedProduct) => {

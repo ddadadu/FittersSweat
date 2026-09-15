@@ -34,6 +34,8 @@ export function AiCoachDrawer() {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const drawerRef = useRef<HTMLElement>(null);
+  const triggerElementRef = useRef<HTMLElement | null>(null);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -42,18 +44,48 @@ export function AiCoachDrawer() {
     }
   }, [messages, isOpen, isLoading]);
 
-  // Focus input when opened
+  // Focus input when opened & save previously active element for return focus
   useEffect(() => {
     if (isOpen) {
+      if (typeof document !== 'undefined') {
+        triggerElementRef.current = document.activeElement as HTMLElement;
+      }
       setTimeout(() => inputRef.current?.focus(), 250);
+    } else {
+      triggerElementRef.current?.focus();
     }
   }, [isOpen]);
 
-  // Handle Escape key to close
+  // Handle Escape key to close and Tab focus trap inside drawer
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
+      if (!isOpen) return;
+
+      if (e.key === 'Escape') {
         setOpen(false);
+        return;
+      }
+
+      if (e.key === 'Tab' && drawerRef.current) {
+        const focusableElements = drawerRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusableElements.length === 0) return;
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement) {
+            e.preventDefault();
+            lastElement.focus();
+          }
+        } else {
+          if (document.activeElement === lastElement) {
+            e.preventDefault();
+            firstElement.focus();
+          }
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -104,6 +136,7 @@ export function AiCoachDrawer() {
 
           {/* Left Slide-over Drawer */}
           <motion.aside
+            ref={drawerRef}
             initial={{ x: '-100%' }}
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
@@ -136,7 +169,7 @@ export function AiCoachDrawer() {
                 <button
                   type="button"
                   onClick={resetConversation}
-                  className="p-2 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFD700]"
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFD700]"
                   title="새 대화 시작"
                   aria-label="새 대화 시작"
                 >
@@ -145,7 +178,7 @@ export function AiCoachDrawer() {
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="p-2 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFD700]"
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFD700]"
                   aria-label="대화창 닫기"
                 >
                   <X className="w-5 h-5" />
@@ -163,10 +196,10 @@ export function AiCoachDrawer() {
                 <button
                   type="button"
                   onClick={clearError}
-                  className="text-rose-400 hover:text-rose-200 p-1"
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center text-rose-400 hover:text-rose-200 -mr-2 -my-1 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
                   aria-label="알림 닫기"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
             )}

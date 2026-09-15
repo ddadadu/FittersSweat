@@ -138,6 +138,12 @@ export const useAiChatStore = create<AiChatState>()(
           createdAt: Date.now(),
         };
 
+        // Sliding Window: send only the previous 5 messages to the backend (excluding current query)
+        const recentHistory = state.messages.slice(-5).map((m) => ({
+          role: m.role,
+          content: m.content,
+        }));
+
         // Optimistically append user message
         const nextMessages = [...state.messages, userMsg];
         set({
@@ -145,12 +151,6 @@ export const useAiChatStore = create<AiChatState>()(
           isLoading: true,
           error: null,
         });
-
-        // Sliding Window: send only the last 5 messages to the backend
-        const recentHistory = nextMessages.slice(-5).map((m) => ({
-          role: m.role,
-          content: m.content,
-        }));
 
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
         const token =
@@ -221,7 +221,6 @@ export const useAiChatStore = create<AiChatState>()(
       partialize: (state) => ({
         messages: state.messages,
         currentCategory: state.currentCategory,
-        isOpen: state.isOpen,
         warningCount: state.warningCount,
         isBanned: state.isBanned,
         guestQueryCount: state.guestQueryCount,

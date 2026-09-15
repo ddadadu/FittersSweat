@@ -35,7 +35,10 @@ export function MiniProductCard({ product }: MiniProductCardProps) {
 
   return (
     <div className="flex-shrink-0 w-[140px] bg-[#141414] border border-[#262626] rounded-xl p-2.5 flex flex-col justify-between hover:border-[#FFD700]/60 transition-all group">
-      <Link href={`/products/${product.id}`} className="block">
+      <Link
+        href={`/products/${product.id}`}
+        className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFD700]"
+      >
         <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-neutral-900 mb-2 border border-neutral-800">
           <Image
             src={
@@ -53,10 +56,8 @@ export function MiniProductCard({ product }: MiniProductCardProps) {
             </span>
           )}
         </div>
-        <h4
-          className="text-xs font-bold text-white line-clamp-1 group-hover:text-[#FFD700] transition-colors"
-          title={product.name}
-        >
+
+        <h4 className="text-xs font-bold text-white group-hover:text-[#FFD700] transition-colors line-clamp-2 leading-tight">
           {product.name}
         </h4>
         <p className="text-xs font-black text-[#FFD700] mt-0.5">
@@ -68,7 +69,7 @@ export function MiniProductCard({ product }: MiniProductCardProps) {
         onClick={handleAddToCart}
         type="button"
         aria-label={`${product.name} 장바구니에 담기`}
-        className={`mt-2 w-full min-h-[36px] py-1.5 px-2 rounded-lg text-[11px] font-bold flex items-center justify-center space-x-1 transition-all ${
+        className={`mt-2 w-full min-h-[44px] py-2 px-2 rounded-lg text-xs font-bold flex items-center justify-center space-x-1 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFD700] ${
           added
             ? 'bg-[#10B981] text-white'
             : 'bg-[#262626] text-white hover:bg-[#FFD700] hover:text-black'
