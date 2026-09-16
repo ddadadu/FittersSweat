@@ -37,6 +37,29 @@ export function AiCoachDrawer() {
   const drawerRef = useRef<HTMLElement>(null);
   const triggerElementRef = useRef<HTMLElement | null>(null);
 
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    const checkDesktop = () => {
+      setIsDesktop(typeof window !== 'undefined' && window.innerWidth >= 1024);
+    };
+    checkDesktop();
+    window.addEventListener('resize', checkDesktop);
+    return () => window.removeEventListener('resize', checkDesktop);
+  }, []);
+
+  // Toggle 'ai-coach-open' on document.body for desktop push layout
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.body.classList.toggle('ai-coach-open', isOpen);
+    }
+    return () => {
+      if (typeof document !== 'undefined') {
+        document.body.classList.remove('ai-coach-open');
+      }
+    };
+  }, [isOpen]);
+
   // Auto-scroll to bottom on new messages
   useEffect(() => {
     if (isOpen) {
@@ -56,13 +79,18 @@ export function AiCoachDrawer() {
     }
   }, [isOpen]);
 
-  // Handle Escape key to close and Tab focus trap inside drawer
+  // Handle Escape key to close and Tab focus trap inside drawer (mobile only)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isOpen) return;
 
       if (e.key === 'Escape') {
         setOpen(false);
+        return;
+      }
+
+      // Only trap focus on mobile (< 1024px); on desktop, allow tabbing out to main page
+      if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
         return;
       }
 
@@ -92,9 +120,9 @@ export function AiCoachDrawer() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, setOpen]);
 
-  // Lock body scroll on mobile when open
+  // Lock body scroll only on mobile/tablet (< 1024px) when open
   useEffect(() => {
-    if (isOpen && typeof window !== 'undefined' && window.innerWidth < 640) {
+    if (isOpen && typeof window !== 'undefined' && window.innerWidth < 1024) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -123,14 +151,14 @@ export function AiCoachDrawer() {
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop (visible on mobile / semi-transparent overlay) */}
+          {/* Backdrop (visible on mobile / semi-transparent overlay, hidden on desktop for push layout) */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={() => setOpen(false)}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 lg:bg-black/30"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 lg:hidden"
             aria-hidden="true"
           />
 
@@ -142,8 +170,8 @@ export function AiCoachDrawer() {
             exit={{ x: '-100%' }}
             transition={{ type: 'spring', damping: 26, stiffness: 280 }}
             className="fixed top-0 left-0 h-full w-full sm:max-w-[440px] bg-[#141414] border-r border-[#262626] z-50 flex flex-col shadow-2xl text-white select-text"
-            role="dialog"
-            aria-modal="true"
+            role={isDesktop ? "complementary" : "dialog"}
+            aria-modal={isDesktop ? "false" : "true"}
             aria-label="AI 기어 코치 대화창"
           >
             {/* Header */}

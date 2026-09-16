@@ -27,6 +27,7 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const { user, isAuthenticated, logout, setAuthModalOpen } = useAuthStore();
+  const isAiCoachOpen = useAiChatStore((state) => state.isOpen);
 
   // Subscribe to getItemCount() from useCartStore
   const itemCount = useCartStore((state) => {
@@ -108,7 +109,8 @@ export default function Navbar() {
         <nav className="hidden md:flex items-center space-x-1 lg:space-x-4 h-16">
           {navLinks.map((link) => {
             const Icon = link.icon;
-            const active = isRouteActive(link.href);
+            const isAiLink = link.href === '/recommend';
+            const active = isAiLink ? (isRouteActive(link.href) || isAiCoachOpen) : isRouteActive(link.href);
             return (
               <Link
                 key={link.href}
@@ -241,7 +243,8 @@ export default function Navbar() {
           <div className="flex flex-col space-y-1">
             {navLinks.map((link) => {
               const Icon = link.icon;
-              const active = isRouteActive(link.href);
+              const isAiLink = link.href === '/recommend';
+              const active = isAiLink ? (isRouteActive(link.href) || isAiCoachOpen) : isRouteActive(link.href);
               return (
                 <Link
                   key={link.href}
