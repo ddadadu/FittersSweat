@@ -3,6 +3,8 @@
 import React from 'react';
 import Link from 'next/link';
 import { Calendar, MapPin, Heart, ExternalLink, ArrowRight } from 'lucide-react';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { showToast } from '@/stores/useToastStore';
 
 export interface EventItem {
   id: string;
@@ -29,6 +31,19 @@ export default function EventCard({ event, isInterested = false, onToggleInteres
   const dDayText = diffDays > 0 ? `D-${diffDays}` : diffDays === 0 ? 'D-DAY' : '종료';
   const cityLabel = event.cityCode === 'SEL' ? '서울 (Seoul)' : event.cityCode === 'ICN' ? '인천 송도 (Incheon)' : event.cityCode;
 
+  const handleInterestClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const { isAuthenticated, setAuthModalOpen } = useAuthStore.getState();
+    if (!isAuthenticated) {
+      showToast('회원가입 후 관심 대회를 등록해주세요!', 'warning');
+      setAuthModalOpen(true, 'signup');
+      return;
+    }
+    if (onToggleInterest) {
+      onToggleInterest(event.id);
+    }
+  };
+
   return (
     <div className="rounded-2xl bg-neutral-900 border border-neutral-800 p-6 flex flex-col justify-between hover:border-neutral-700 transition-all hover:shadow-xl hover:shadow-black/50 group">
       <div>
@@ -37,13 +52,15 @@ export default function EventCard({ event, isInterested = false, onToggleInteres
             {dDayText}
           </span>
           <button
-            onClick={() => onToggleInterest && onToggleInterest(event.id)}
-            className={`p-2 rounded-full border transition-colors ${
+            type="button"
+            onClick={handleInterestClick}
+            className={`min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFD700] ${
               isInterested
                 ? 'bg-rose-500/10 border-rose-500 text-rose-500'
                 : 'border-neutral-700 text-neutral-400 hover:text-white hover:border-neutral-500'
             }`}
             title={isInterested ? '관심 대회 취소' : '관심 대회 등록'}
+            aria-label={isInterested ? '관심 대회 등록 해제' : '관심 대회 등록'}
           >
             <Heart className={`w-4 h-4 ${isInterested ? 'fill-rose-500' : ''}`} />
           </button>

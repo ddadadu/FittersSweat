@@ -18,7 +18,7 @@ interface AuthState {
   authModalTab: 'login' | 'signup';
   setAuthModalOpen: (open: boolean, tab?: 'login' | 'signup') => void;
   login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string, name: string) => Promise<void>;
+  signup: (email: string, password: string, name: string, verificationToken?: string) => Promise<void>;
   updateProfile: (data: { name?: string; currentPassword?: string; newPassword?: string }) => Promise<void>;
   logout: () => void;
   deleteAccount: (password: string) => Promise<void>;
@@ -63,13 +63,34 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  signup: async (email, password, name) => {
-    await fetchApi('/api/v1/auth/signup', {
+  signup: async (email, password, name, verificationToken) => {
+    const res = await fetchApi<{
+      success: boolean;
+      accessToken?: string;
+      refreshToken?: string;
+      user?: AuthUser;
+    }>('/api/v1/auth/signup', {
       method: 'POST',
-      body: JSON.stringify({ email, password, name }),
+      body: JSON.stringify({ email, password, name, verificationToken }),
     });
-    // Automatically log in after successful signup
-    await get().login(email, password);
+
+    if (res.accessToken && res.user) {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('accessToken', res.accessToken);
+        if (res.refreshToken) {
+          localStorage.setItem('refreshToken', res.refreshToken);
+        }
+      }
+      set({
+        user: res.user,
+        accessToken: res.accessToken,
+        isAuthenticated: true,
+        authModalOpen: false,
+      });
+    } else {
+      // Automatically log in after successful signup
+      await get().login(email, password);
+    }
   },
 
   updateProfile: async (data) => {

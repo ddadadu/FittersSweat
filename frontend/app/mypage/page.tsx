@@ -29,6 +29,7 @@ import {
   LogIn,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { showToast } from '@/stores/useToastStore';
 import EditProfileModal from '@/components/EditProfileModal';
 import DeleteAccountModal from '@/components/DeleteAccountModal';
 
@@ -240,11 +241,12 @@ export default function MyPage() {
       if (context?.previous) {
         queryClient.setQueryData(['events', 'interested'], context.previous);
       }
-      alert(err.message || '관심 대회 설정에 실패했습니다.');
+      showToast(err.message || '관심 대회 설정에 실패했습니다.', 'error');
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['events', 'interested'] });
       queryClient.invalidateQueries({ queryKey: ['events'] });
+      queryClient.invalidateQueries({ queryKey: ['interestedEvents'] });
     },
   });
 

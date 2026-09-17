@@ -2,10 +2,12 @@
 
 import React from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchApi } from '@/lib/api';
 import Link from 'next/link';
-import { Calendar, MapPin, ExternalLink, ArrowLeft, MessageSquare, Plus, ShoppingBag } from 'lucide-react';
+import { Calendar, MapPin, ExternalLink, ArrowLeft, Heart, MessageSquare, Plus, ShoppingBag } from 'lucide-react';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { showToast } from '@/stores/useToastStore';
 
 interface EventDetail {
   id: string;
@@ -26,13 +28,50 @@ interface EventDetail {
 export default function EventDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const eventId = params.id as string;
+  const { isAuthenticated } = useAuthStore();
 
   const { data, isLoading, error } = useQuery<{ success: boolean; event: EventDetail }>({
     queryKey: ['event', eventId],
     queryFn: () => fetchApi(`/api/v1/events/${eventId}`),
     enabled: !!eventId,
   });
+
+  const { data: interestedData } = useQuery<{ success: boolean; events: Array<{ id: string }> }>({
+    queryKey: ['interestedEvents'],
+    queryFn: () => fetchApi('/api/v1/events/interested'),
+    enabled: isAuthenticated,
+  });
+
+  const isInterested = (interestedData?.events || []).some((e) => e.id === eventId);
+
+  const toggleInterestMutation = useMutation({
+    mutationFn: () =>
+      fetchApi<{ success: boolean; isInterested: boolean }>(`/api/v1/events/${eventId}/interested`, {
+        method: 'POST',
+      }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['interestedEvents'] });
+      queryClient.invalidateQueries({ queryKey: ['events'] });
+      showToast(
+        res.isInterested ? '관심 대회로 등록되었습니다.' : '관심 대회가 해제되었습니다.',
+        'success'
+      );
+    },
+    onError: (err: any) => {
+      showToast(err.message || '관심 대회 처리에 실패했습니다.', 'error');
+    },
+  });
+
+  const handleInterestClick = () => {
+    if (!isAuthenticated) {
+      showToast('회원가입 후 관심 대회를 등록해주세요!', 'warning');
+      useAuthStore.getState().setAuthModalOpen(true, 'signup');
+      return;
+    }
+    toggleInterestMutation.mutate();
+  };
 
   if (isLoading) {
     return (
@@ -77,17 +116,33 @@ export default function EventDetailPage() {
           <span className="px-3.5 py-1 rounded-full text-xs font-black bg-[#FFD700] text-black">
             {event.status.toUpperCase()}
           </span>
-          {event.eventUrl && (
-            <a
-              href={event.eventUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-[#FFD700] text-black text-xs font-extrabold hover:bg-yellow-400 transition-colors shadow-md"
+          <div className="flex items-center space-x-2">
+            <button
+              type="button"
+              onClick={handleInterestClick}
+              className={`min-h-[40px] px-3.5 py-2 rounded-xl border transition-colors flex items-center space-x-1.5 text-xs font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFD700] ${
+                isInterested
+                  ? 'bg-rose-500/10 border-rose-500 text-rose-500'
+                  : 'border-neutral-700 text-neutral-400 hover:text-white hover:border-neutral-500'
+              }`}
+              title={isInterested ? '관심 대회 등록 해제' : '관심 대회 등록'}
+              aria-label={isInterested ? '관심 대회 등록 해제' : '관심 대회 등록'}
             >
-              <span>공식 참가접수 바로가기</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          )}
+              <Heart className={`w-4 h-4 ${isInterested ? 'fill-rose-500' : ''}`} />
+              <span>{isInterested ? '관심 대회' : '관심 등록'}</span>
+            </button>
+            {event.eventUrl && (
+              <a
+                href={event.eventUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-[#FFD700] text-black text-xs font-extrabold hover:bg-yellow-400 transition-colors shadow-md min-h-[40px]"
+              >
+                <span>공식 참가접수 바로가기</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            )}
+          </div>
         </div>
 
         <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">

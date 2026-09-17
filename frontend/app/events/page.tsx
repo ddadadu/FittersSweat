@@ -1,28 +1,50 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchApi } from '@/lib/api';
 import EventCard, { EventItem } from '@/components/EventCard';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { showToast } from '@/stores/useToastStore';
 import { Trophy, Filter } from 'lucide-react';
 
 export default function EventsPage() {
   const queryClient = useQueryClient();
   const [filterCity, setFilterCity] = useState<string>('ALL');
+  const { isAuthenticated } = useAuthStore();
 
+  // 1. 전체 대회 목록 조회
   const { data, isLoading, error } = useQuery<{ success: boolean; events: EventItem[] }>({
     queryKey: ['events'],
     queryFn: () => fetchApi('/api/v1/events'),
   });
 
+  // 2. 로그인 회원 관심 대회 목록 조회 (동기화)
+  const { data: interestedData } = useQuery<{ success: boolean; events: EventItem[] }>({
+    queryKey: ['interestedEvents'],
+    queryFn: () => fetchApi('/api/v1/events/interested'),
+    enabled: isAuthenticated,
+  });
+
+  const interestedSet = useMemo(() => {
+    return new Set((interestedData?.events || []).map((e) => e.id));
+  }, [interestedData]);
+
   const toggleInterestMutation = useMutation({
     mutationFn: (eventId: string) =>
-      fetchApi(`/api/v1/events/${eventId}/interested`, { method: 'POST' }),
-    onSuccess: () => {
+      fetchApi<{ success: boolean; isInterested: boolean }>(`/api/v1/events/${eventId}/interested`, {
+        method: 'POST',
+      }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['interestedEvents'] });
       queryClient.invalidateQueries({ queryKey: ['events'] });
+      showToast(
+        res.isInterested ? '관심 대회로 등록되었습니다.' : '관심 대회가 해제되었습니다.',
+        'success'
+      );
     },
     onError: (err: any) => {
-      alert(err.message || '로그인이 필요한 기능입니다.');
+      showToast(err.message || '관심 대회 등록에 실패했습니다.', 'error');
     },
   });
 
@@ -88,6 +110,7 @@ export default function EventsPage() {
             <EventCard
               key={event.id}
               event={event}
+              isInterested={interestedSet.has(event.id)}
               onToggleInterest={(id) => toggleInterestMutation.mutate(id)}
             />
           ))}

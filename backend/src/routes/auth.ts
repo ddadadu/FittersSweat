@@ -5,16 +5,37 @@ import { z } from 'zod';
 
 const prisma = new PrismaClient();
 
+import crypto from 'crypto';
+import { EmailService } from '../services/email.service';
+
 // BigInt JSON 직렬화 지원
 (BigInt.prototype as any).toJSON = function () {
   return this.toString();
 };
+
+interface OtpEntry {
+  code: string;
+  expiresAt: number;
+  attempts: number;
+  lastSentAt: number;
+}
+export const emailOtpStore = new Map<string, OtpEntry>();
+
+const sendOtpSchema = z.object({
+  email: z.string().email('올바른 이메일 형식을 입력해 주세요.'),
+});
+
+const verifyOtpSchema = z.object({
+  email: z.string().email('올바른 이메일 형식을 입력해 주세요.'),
+  code: z.string().length(6, '6자리 인증 코드를 입력해 주세요.'),
+});
 
 const signupSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
   name: z.string().min(1),
   role: z.nativeEnum(Role).optional(),
+  verificationToken: z.string().optional(),
 });
 
 const loginSchema = z.object({
@@ -27,6 +48,166 @@ const refreshSchema = z.object({
 });
 
 export async function authRoutes(app: FastifyInstance) {
+  // 0-1. 회원가입 이메일 인증번호 발송 (POST /api/v1/auth/send-verification-email)
+  app.post(
+    '/send-verification-email',
+    {
+      schema: {
+        tags: ['Auth'],
+        summary: '이메일 인증번호 발송',
+        description: '회원가입을 위한 6자리 OTP 인증 코드를 이메일로 전송합니다.',
+        body: {
+          type: 'object',
+          required: ['email'],
+          properties: {
+            email: { type: 'string', format: 'email', example: 'runner@naver.com' },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const parseResult = sendOtpSchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply.status(400).send({
+          message: '올바른 이메일 주소를 입력해 주세요.',
+          errors: parseResult.error.errors,
+        });
+      }
+
+      const { email } = parseResult.data;
+
+      // 1. 이미 가입된 이메일 중복 체크
+      const existing = await prisma.user.findUnique({ where: { email } });
+      if (existing) {
+        return reply.status(409).send({ message: '이미 가입된 이메일 주소입니다.' });
+      }
+
+      // 2. 30초 내 재발송 방지 Rate Limit 가드
+      const prevEntry = emailOtpStore.get(email);
+      const now = Date.now();
+      if (prevEntry && now - prevEntry.lastSentAt < 30 * 1000) {
+        const waitSeconds = Math.ceil((30 * 1000 - (now - prevEntry.lastSentAt)) / 1000);
+        return reply.status(429).send({
+          message: `인증번호는 ${waitSeconds}초 후에 재발송할 수 있습니다.`,
+        });
+      }
+
+      // 3. 6자리 난수 OTP 생성
+      const code = crypto.randomInt(100000, 1000000).toString();
+
+      // 4. 인메모리 OTP 저장소에 5분(300초) TTL 저장
+      emailOtpStore.set(email, {
+        code,
+        expiresAt: now + 5 * 60 * 1000,
+        attempts: 0,
+        lastSentAt: now,
+      });
+
+      // 5. Nodemailer로 메일 발송
+      try {
+        await EmailService.sendVerificationEmail({ to: email, code });
+      } catch (err: any) {
+        emailOtpStore.delete(email);
+        return reply.status(500).send({
+          message: err.message || '이메일 발송에 실패했습니다. 잠시 후 다시 시도해 주세요.',
+        });
+      }
+
+      return reply.send({
+        success: true,
+        message: '인증번호가 발송되었습니다. 5분 이내에 입력해 주세요.',
+      });
+    }
+  );
+
+  // 0-2. 이메일 인증번호 검증 (POST /api/v1/auth/verify-email-code)
+  app.post(
+    '/verify-email-code',
+    {
+      schema: {
+        tags: ['Auth'],
+        summary: '이메일 인증번호 확인',
+        description: '수신한 6자리 OTP 코드를 검증하고 서명된 가입 인증 토큰을 발급합니다.',
+        body: {
+          type: 'object',
+          required: ['email', 'code'],
+          properties: {
+            email: { type: 'string', format: 'email' },
+            code: { type: 'string', minLength: 6, maxLength: 6 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const parseResult = verifyOtpSchema.safeParse(request.body);
+      if (!parseResult.success) {
+        return reply.status(400).send({
+          message: '이메일과 6자리 인증 코드를 정확히 입력해 주세요.',
+          errors: parseResult.error.errors,
+        });
+      }
+
+      const { email, code } = parseResult.data;
+      const entry = emailOtpStore.get(email);
+
+      if (!entry) {
+        return reply.status(400).send({
+          message: '인증번호가 발송되지 않았거나 만료되었습니다. 인증번호를 요청해 주세요.',
+        });
+      }
+
+      // 1. 유효시간 만료 체크 (5분)
+      if (Date.now() > entry.expiresAt) {
+        emailOtpStore.delete(email);
+        return reply.status(400).send({
+          message: '인증 유효시간(5분)이 초과되었습니다. 인증번호를 다시 발송해 주세요.',
+        });
+      }
+
+      // 2. 무차별 대입(Brute-Force) 방어: 최대 5회 초과 시 파기
+      if (entry.attempts >= 5) {
+        emailOtpStore.delete(email);
+        return reply.status(429).send({
+          message: '인증 시도 횟수(5회)를 초과했습니다. 인증번호를 다시 요청해 주세요.',
+        });
+      }
+
+      // 3. Timing-Safe 문자열 검증
+      const inputBuffer = Buffer.from(code.trim());
+      const targetBuffer = Buffer.from(entry.code);
+      const isMatch =
+        inputBuffer.length === targetBuffer.length &&
+        crypto.timingSafeEqual(inputBuffer, targetBuffer);
+
+      if (!isMatch) {
+        entry.attempts += 1;
+        const remaining = 5 - entry.attempts;
+        if (remaining <= 0) {
+          emailOtpStore.delete(email);
+          return reply.status(429).send({
+            message: '인증 시도 횟수를 초과했습니다. 인증번호를 다시 요청해 주세요.',
+          });
+        }
+        return reply.status(400).send({
+          message: `인증번호가 일치하지 않습니다. (남은 시도: ${remaining}회)`,
+        });
+      }
+
+      // 4. 인증 성공: OTP 파기 및 10분 유효기간 서명 토큰 발급
+      emailOtpStore.delete(email);
+      const verificationToken = app.jwt.sign(
+        { email, purpose: 'email_verified' },
+        { expiresIn: '10m' }
+      );
+
+      return reply.send({
+        success: true,
+        verificationToken,
+        message: '이메일 인증이 성공적으로 완료되었습니다.',
+      });
+    }
+  );
+
   // 1. 회원가입
   app.post(
     '/signup',
@@ -42,6 +223,7 @@ export async function authRoutes(app: FastifyInstance) {
             email: { type: 'string', format: 'email', example: 'runner@naver.com' },
             password: { type: 'string', minLength: 6, example: 'password123!' },
             name: { type: 'string', example: '김러너' },
+            verificationToken: { type: 'string' },
           },
         },
       },
@@ -55,7 +237,21 @@ export async function authRoutes(app: FastifyInstance) {
         });
       }
 
-      const { email, password, name, role } = parseResult.data;
+      const { email, password, name, role, verificationToken } = parseResult.data;
+
+      // 이메일 인증 토큰 검증
+      if (verificationToken) {
+        try {
+          const decoded = app.jwt.verify<{ email: string; purpose: string }>(verificationToken);
+          if (decoded.purpose !== 'email_verified' || decoded.email !== email) {
+            return reply.status(400).send({ message: '인증된 이메일 정보와 일치하지 않습니다.' });
+          }
+        } catch {
+          return reply.status(400).send({ message: '인증 토큰이 만료되었거나 올바르지 않습니다.' });
+        }
+      } else if (process.env.NODE_ENV === 'production') {
+        return reply.status(400).send({ message: '이메일 인증이 필요합니다.' });
+      }
 
       const existing = await prisma.user.findUnique({ where: { email } });
       if (existing) {
@@ -79,9 +275,21 @@ export async function authRoutes(app: FastifyInstance) {
         },
       });
 
+      // 즉시 로그인 가능한 액세스/리프레시 토큰 발급
+      const accessToken = app.jwt.sign(
+        { id: user.id.toString(), email: user.email, role: user.role },
+        { expiresIn: '1h' }
+      );
+      const refreshToken = app.jwt.sign(
+        { id: user.id.toString() },
+        { expiresIn: '7d' }
+      );
+
       return reply.status(201).send({
         success: true,
         user,
+        accessToken,
+        refreshToken,
       });
     }
   );

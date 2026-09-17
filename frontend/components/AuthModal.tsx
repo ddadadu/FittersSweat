@@ -3,7 +3,20 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { X, Mail, Lock, User, AlertCircle, Sparkles, ArrowRight } from 'lucide-react';
+import {
+  X,
+  Mail,
+  Lock,
+  User,
+  AlertCircle,
+  Sparkles,
+  ArrowRight,
+  CheckCircle2,
+  Clock,
+  RotateCw,
+  Loader2,
+} from 'lucide-react';
+import { fetchApi } from '@/lib/api';
 
 export default function AuthModal() {
   const { authModalOpen, authModalTab, setAuthModalOpen, login, signup } = useAuthStore();
@@ -14,15 +27,58 @@ export default function AuthModal() {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [name, setName] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Email OTP verification state
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isOtpSent, setIsOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
+  const [verificationToken, setVerificationToken] = useState<string | null>(null);
+  const [otpTimer, setOtpTimer] = useState<number>(300);
+
+  const resetOtpState = () => {
+    setIsSendingOtp(false);
+    setIsOtpSent(false);
+    setOtpCode('');
+    setIsVerifyingOtp(false);
+    setIsEmailVerified(false);
+    setVerificationToken(null);
+    setOtpTimer(300);
+    setInfoMessage(null);
+    setErrorMessage(null);
+  };
 
   // Sync tab with store state when opened
   useEffect(() => {
     if (authModalOpen) {
       setTab(authModalTab);
-      setErrorMessage(null);
+      resetOtpState();
     }
   }, [authModalOpen, authModalTab]);
+
+  // 5-minute countdown timer for OTP
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    if (isOtpSent && !isEmailVerified && otpTimer > 0) {
+      interval = setInterval(() => {
+        setOtpTimer((prev) => prev - 1);
+      }, 1000);
+    } else if (otpTimer === 0 && isOtpSent && !isEmailVerified) {
+      setErrorMessage('인증번호 유효시간(5분)이 초과되었습니다. 재발송해 주세요.');
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isOtpSent, isEmailVerified, otpTimer]);
+
+  const formatTimer = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   // Lock body scroll when modal is open and handle Escape key
   useEffect(() => {
@@ -45,8 +101,66 @@ export default function AuthModal() {
   }, [authModalOpen, setAuthModalOpen]);
 
   const handleClose = () => {
-    setErrorMessage(null);
+    resetOtpState();
     setAuthModalOpen(false);
+  };
+
+  const handleSendOtp = async () => {
+    setErrorMessage(null);
+    setInfoMessage(null);
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email.trim() || !emailRegex.test(email.trim())) {
+      setErrorMessage('올바른 이메일 형식을 입력해 주세요 (예: runner@example.com).');
+      return;
+    }
+
+    try {
+      setIsSendingOtp(true);
+      const res = await fetchApi<{ success: boolean; message: string }>(
+        '/api/v1/auth/send-verification-email',
+        {
+          method: 'POST',
+          body: JSON.stringify({ email: email.trim() }),
+        }
+      );
+      setIsOtpSent(true);
+      setOtpTimer(300);
+      setInfoMessage(res.message || '인증번호가 발송되었습니다. 이메일을 확인해 주세요.');
+    } catch (err: any) {
+      setErrorMessage(err.message || '인증번호 발송에 실패했습니다.');
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    setErrorMessage(null);
+    setInfoMessage(null);
+
+    if (!otpCode.trim() || otpCode.trim().length !== 6) {
+      setErrorMessage('6자리 인증번호를 정확히 입력해 주세요.');
+      return;
+    }
+
+    try {
+      setIsVerifyingOtp(true);
+      const res = await fetchApi<{ success: boolean; verificationToken: string; message: string }>(
+        '/api/v1/auth/verify-email-code',
+        {
+          method: 'POST',
+          body: JSON.stringify({ email: email.trim(), code: otpCode.trim() }),
+        }
+      );
+
+      setIsEmailVerified(true);
+      setVerificationToken(res.verificationToken);
+      setInfoMessage('이메일 인증이 완료되었습니다.');
+    } catch (err: any) {
+      setErrorMessage(err.message || '인증번호 확인에 실패했습니다.');
+    } finally {
+      setIsVerifyingOtp(false);
+    }
   };
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
@@ -90,6 +204,12 @@ export default function AuthModal() {
       setErrorMessage('올바른 이메일 형식을 입력해 주세요 (예: runner@example.com).');
       return;
     }
+
+    if (!isEmailVerified || !verificationToken) {
+      setErrorMessage('이메일 인증번호 확인을 완료해 주세요.');
+      return;
+    }
+
     if (!password || password.length < 6) {
       setErrorMessage('비밀번호는 최소 6자 이상이어야 합니다.');
       return;
@@ -101,7 +221,7 @@ export default function AuthModal() {
 
     try {
       setIsSubmitting(true);
-      await signup(email.trim(), password, name.trim());
+      await signup(email.trim(), password, name.trim(), verificationToken);
       handleClose();
     } catch (err: any) {
       setErrorMessage(err.message || '회원가입 처리 중 오류가 발생했습니다.');
@@ -194,6 +314,14 @@ export default function AuthModal() {
               <div className="mb-4 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start space-x-2 animate-fadeIn">
                 <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
                 <span className="leading-relaxed">{errorMessage}</span>
+              </div>
+            )}
+
+            {/* Info / Success Banner */}
+            {infoMessage && (
+              <div className="mb-4 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-start space-x-2 animate-fadeIn">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <span className="leading-relaxed">{infoMessage}</span>
               </div>
             )}
 
@@ -294,23 +422,107 @@ export default function AuthModal() {
                 </div>
 
                 <div>
-                  <label htmlFor="signup-email" className="block text-xs font-semibold text-neutral-400 mb-1.5">
-                    이메일 <span className="text-rose-400">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="email"
-                      id="signup-email"
-                      name="email"
-                      autoComplete="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="runner@example.com"
-                      className="w-full bg-neutral-900 border border-neutral-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#FFD700] transition-colors"
-                    />
-                    <Mail className="w-4 h-4 text-neutral-500 absolute left-3.5 top-3 pointer-events-none" />
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label htmlFor="signup-email" className="block text-xs font-semibold text-neutral-400">
+                      이메일 <span className="text-rose-400">*</span>
+                    </label>
+                    {isEmailVerified && (
+                      <span className="inline-flex items-center space-x-1 text-[11px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                        <CheckCircle2 className="w-3 h-3" />
+                        <span>인증 완료</span>
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="relative flex-1">
+                      <input
+                        type="email"
+                        id="signup-email"
+                        name="email"
+                        autoComplete="email"
+                        value={email}
+                        readOnly={isEmailVerified}
+                        onChange={(e) => {
+                          setEmail(e.target.value);
+                          if (isOtpSent) resetOtpState();
+                        }}
+                        placeholder="runner@example.com"
+                        className={`w-full bg-neutral-900 border rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none transition-colors ${
+                          isEmailVerified
+                            ? 'border-emerald-500/50 bg-emerald-500/5 text-emerald-200 cursor-not-allowed'
+                            : 'border-neutral-700 focus:border-[#FFD700]'
+                        }`}
+                      />
+                      <Mail className={`w-4 h-4 absolute left-3.5 top-3 pointer-events-none ${
+                        isEmailVerified ? 'text-emerald-400' : 'text-neutral-500'
+                      }`} />
+                    </div>
+                    {!isEmailVerified && (
+                      <button
+                        type="button"
+                        onClick={handleSendOtp}
+                        disabled={isSendingOtp || !email.trim()}
+                        className="min-h-[42px] px-3.5 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 hover:border-[#FFD700] text-xs font-bold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0 flex items-center space-x-1.5"
+                      >
+                        {isSendingOtp ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-[#FFD700]" />
+                            <span>발송 중...</span>
+                          </>
+                        ) : isOtpSent ? (
+                          <>
+                            <RotateCw className="w-3.5 h-3.5 text-[#FFD700]" />
+                            <span>재발송</span>
+                          </>
+                        ) : (
+                          <span>인증번호 발송</span>
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
+
+                {/* 6-Digit OTP Verification Field */}
+                {isOtpSent && !isEmailVerified && (
+                  <div className="p-3.5 rounded-xl bg-neutral-900/90 border border-neutral-800 space-y-2.5 animate-fadeIn">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-neutral-300">인증 코드 6자리</span>
+                      <span className="flex items-center space-x-1 text-[11px] font-mono font-bold text-[#FFD700]">
+                        <Clock className="w-3 h-3" />
+                        <span>{formatTimer(otpTimer)}</span>
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="text"
+                        maxLength={6}
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
+                        placeholder="6자리 숫자"
+                        className="flex-1 bg-black/60 border border-neutral-700 rounded-xl px-4 py-2 text-sm text-center text-white tracking-[0.3em] font-mono font-bold focus:outline-none focus:border-[#FFD700] transition-colors"
+                        aria-label="이메일 6자리 인증코드 입력"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleVerifyOtp}
+                        disabled={isVerifyingOtp || otpCode.length !== 6}
+                        className="min-h-[40px] px-4 py-2 rounded-xl bg-[#FFD700] hover:bg-yellow-400 text-black text-xs font-black transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0 flex items-center space-x-1"
+                      >
+                        {isVerifyingOtp ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-black" />
+                            <span>확인 중...</span>
+                          </>
+                        ) : (
+                          <span>인증 확인</span>
+                        )}
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-neutral-400">
+                      입력하신 이메일의 수신함(또는 스팸함)을 확인해 주세요.
+                    </p>
+                  </div>
+                )}
 
                 <div>
                   <label htmlFor="signup-password" className="block text-xs font-semibold text-neutral-400 mb-1.5">

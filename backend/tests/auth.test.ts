@@ -19,12 +19,59 @@ describe('Auth API (/api/v1/auth)', () => {
   };
 
   let refreshToken = '';
+  let verificationToken = '';
 
-  it('POST /api/v1/auth/signup - should register a new user', async () => {
+  it('POST /api/v1/auth/send-verification-email - should send verification code', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/send-verification-email',
+      payload: { email: testUser.email },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.payload);
+    expect(body.success).toBe(true);
+    expect(body.message).toMatch(/인증번호가 발송되었습니다/);
+  });
+
+  it('POST /api/v1/auth/verify-email-code - should fail with wrong code', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/verify-email-code',
+      payload: { email: testUser.email, code: '000000' },
+    });
+
+    expect(response.statusCode).toBe(400);
+    const body = JSON.parse(response.payload);
+    expect(body.message).toMatch(/인증번호가 일치하지 않습니다/);
+  });
+
+  it('POST /api/v1/auth/verify-email-code - should succeed with valid code and return token', async () => {
+    const { emailOtpStore } = await import('../src/routes/auth');
+    const entry = emailOtpStore.get(testUser.email);
+    expect(entry).toBeDefined();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/verify-email-code',
+      payload: { email: testUser.email, code: entry!.code },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.payload);
+    expect(body.success).toBe(true);
+    expect(body).toHaveProperty('verificationToken');
+    verificationToken = body.verificationToken;
+  });
+
+  it('POST /api/v1/auth/signup - should register a new user with verificationToken', async () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/v1/auth/signup',
-      payload: testUser,
+      payload: {
+        ...testUser,
+        verificationToken,
+      },
     });
 
     expect(response.statusCode).toBe(201);
@@ -33,6 +80,8 @@ describe('Auth API (/api/v1/auth)', () => {
     expect(body.user).toHaveProperty('id');
     expect(body.user.email).toBe(testUser.email);
     expect(body.user).not.toHaveProperty('passwordHash');
+    expect(body).toHaveProperty('accessToken');
+    expect(body).toHaveProperty('refreshToken');
   });
 
   it('POST /api/v1/auth/signup - should reject duplicate email (409 Conflict)', async () => {
