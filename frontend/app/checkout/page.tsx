@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { loadTossPayments, ANONYMOUS, TossPaymentsWidgets } from '@tosspayments/tosspayments-sdk';
+import { loadTossPayments, ANONYMOUS } from '@tosspayments/tosspayments-sdk';
 import { useCartStore } from '@/stores/useCartStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { fetchApi, ensureAuthToken } from '@/lib/api';
@@ -23,6 +23,7 @@ import {
   ChevronLeft,
   Check,
   Search,
+  CheckCircle2,
 } from 'lucide-react';
 import { openDaumPostcodePopup, loadDaumPostcodeScript } from '@/lib/daumPostcode';
 
@@ -62,10 +63,13 @@ export default function CheckoutPage() {
   const [sameAsOrderer, setSameAsOrderer] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isWidgetLoading, setIsWidgetLoading] = useState(true);
-  const [widgetError, setWidgetError] = useState(false);
+  const [agreedTerms, setAgreedTerms] = useState({
+    all: false,
+    orderTerms: false,
+    privacyTerms: false,
+  });
+  const [termsError, setTermsError] = useState(false);
 
-  const widgetsRef = useRef<TossPaymentsWidgets | null>(null);
   const totalAmount = getTotalAmount();
 
   // 1. Mount & Auth Guard: Ensure valid token exists; auto-refresh if expired; preload Daum Postcode script
@@ -75,83 +79,31 @@ export default function CheckoutPage() {
       console.warn('Auto auth validation notice:', err)
     );
     loadDaumPostcodeScript().catch(() => {});
-
-    return () => {
-      widgetsRef.current = null;
-    };
   }, []);
 
-  // 2. Initialize or Update Toss Payments SDK v2 Widgets
-  useEffect(() => {
-    if (!mounted || items.length === 0 || totalAmount <= 0) {
-      setIsWidgetLoading(false);
-      return;
+  const handleAllTermsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const checked = e.target.checked;
+    setAgreedTerms({
+      all: checked,
+      orderTerms: checked,
+      privacyTerms: checked,
+    });
+    if (checked) {
+      setTermsError(false);
     }
+  };
 
-    // Review Finding #5: If widgets instance already exists, update amount dynamically
-    if (widgetsRef.current) {
-      widgetsRef.current
-        .setAmount({
-          currency: 'KRW',
-          value: totalAmount,
-        })
-        .catch((e) => console.warn('Failed to update widget amount:', e));
-      setIsWidgetLoading(false);
-      return;
-    }
-
-    let isMounted = true;
-
-    async function initTossWidgets() {
-      try {
-        setIsWidgetLoading(true);
-        setWidgetError(false);
-
-        const tossPayments = await loadTossPayments(TOSS_CLIENT_KEY);
-        if (!isMounted) return;
-
-        const widgets = tossPayments.widgets({ customerKey: ANONYMOUS });
-        await widgets.setAmount({
-          currency: 'KRW',
-          value: totalAmount,
-        });
-
-        // Prevent duplicate widget iframe containers
-        document.querySelector('#payment-method')?.replaceChildren();
-        document.querySelector('#agreement')?.replaceChildren();
-
-        await Promise.all([
-          widgets.renderPaymentMethods({
-            selector: '#payment-method',
-            variantKey: 'DEFAULT',
-          }),
-          widgets.renderAgreement({
-            selector: '#agreement',
-            variantKey: 'AGREEMENT',
-          }),
-        ]);
-
-        if (isMounted) {
-          widgetsRef.current = widgets;
-        }
-      } catch (err) {
-        console.warn('Toss Payments SDK Widget init notice / fallback:', err);
-        if (isMounted) {
-          setWidgetError(true);
-        }
-      } finally {
-        if (isMounted) {
-          setIsWidgetLoading(false);
-        }
-      }
-    }
-
-    initTossWidgets();
-
-    return () => {
-      isMounted = false;
+  const handleSingleTermChange =
+    (key: 'orderTerms' | 'privacyTerms') =>
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const checked = e.target.checked;
+      setAgreedTerms((prev) => {
+        const next = { ...prev, [key]: checked };
+        next.all = next.orderTerms && next.privacyTerms;
+        return next;
+      });
+      setTermsError(false);
     };
-  }, [mounted, items.length, totalAmount]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -313,19 +265,23 @@ export default function CheckoutPage() {
     }
   };
 
-  // 1. Official Toss Payment Flow
+  // 1. Official Toss Payment Flow (Standard Payment Window)
   const handlePayment = async () => {
     setErrorMessage(null);
-    setIsSubmitting(true);
+    setTermsError(false);
 
-    // Check widget readiness before creating pending backend order
-    if (!widgetsRef.current) {
-      setErrorMessage(
-        '토스 결제 위젯이 아직 준비되지 않았습니다. 잠시 후 다시 시도하시거나 아래 테스트 결제 버튼을 이용해 주세요.'
-      );
-      setIsSubmitting(false);
+    // Validate terms agreement
+    if (!agreedTerms.orderTerms || !agreedTerms.privacyTerms) {
+      setTermsError(true);
+      setErrorMessage('주문 및 결제 진행을 위해 필수 약관에 동의해 주세요.');
+      if (typeof document !== 'undefined') {
+        const el = document.getElementById('orderTerms');
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
       return;
     }
+
+    setIsSubmitting(true);
 
     let orderId: string | null = null;
     try {
@@ -340,8 +296,18 @@ export default function CheckoutPage() {
           ? items[0].name
           : `${items[0].name} 외 ${items.length - 1}건`;
 
-      await widgetsRef.current.requestPayment({
-        orderId,
+      const formattedOrderId = `FS_${String(orderId).padStart(6, '0')}`;
+
+      const tossPayments = await loadTossPayments(TOSS_CLIENT_KEY);
+      const payment = tossPayments.payment({ customerKey: ANONYMOUS });
+
+      await payment.requestPayment({
+        method: 'CARD',
+        amount: {
+          currency: 'KRW',
+          value: totalAmount,
+        },
+        orderId: formattedOrderId,
         orderName,
         successUrl: `${window.location.origin}/checkout/success`,
         failUrl: `${window.location.origin}/checkout/fail?amount=${totalAmount}`,
@@ -352,10 +318,12 @@ export default function CheckoutPage() {
       console.error('Payment request failed or cancelled:', err);
       // Review Finding #1: On requestPayment rejection/cancellation, route to fail page with orderId for stock rollback
       const code = err.code || 'USER_CANCEL';
-      const msg = err.message || '사용자가 결제를 취소하였거나 결제 진행 중 오류가 발생했습니다.';
+      const msg =
+        err.message || '사용자가 결제를 취소하였거나 결제 진행 중 오류가 발생했습니다.';
       if (orderId) {
+        const rollbackOrderId = `FS_${String(orderId).padStart(6, '0')}`;
         router.push(
-          `/checkout/fail?code=${encodeURIComponent(code)}&message=${encodeURIComponent(msg)}&orderId=${orderId}&amount=${totalAmount}`
+          `/checkout/fail?code=${encodeURIComponent(code)}&message=${encodeURIComponent(msg)}&orderId=${rollbackOrderId}&amount=${totalAmount}`
         );
       } else {
         setErrorMessage(msg);
@@ -367,6 +335,14 @@ export default function CheckoutPage() {
   // 2. Mock Test Success Flow (for test automation / restricted popup environments)
   const handleMockSuccess = async () => {
     setErrorMessage(null);
+    setTermsError(false);
+
+    if (!agreedTerms.orderTerms || !agreedTerms.privacyTerms) {
+      setTermsError(true);
+      setErrorMessage('주문 및 결제 진행을 위해 필수 약관에 동의해 주세요.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -376,8 +352,9 @@ export default function CheckoutPage() {
         return;
       }
 
+      const formattedOrderId = `FS_${String(orderId).padStart(6, '0')}`;
       router.push(
-        `/checkout/success?paymentKey=test_mock_success_key&orderId=${orderId}&amount=${totalAmount}`
+        `/checkout/success?paymentKey=test_mock_success_key&orderId=${formattedOrderId}&amount=${totalAmount}`
       );
     } catch (err: any) {
       setErrorMessage(err.message || '모의 결제 처리 중 오류가 발생했습니다.');
@@ -388,6 +365,14 @@ export default function CheckoutPage() {
   // 3. Mock Test Fail Flow (for test automation / rollback validation)
   const handleMockFail = async () => {
     setErrorMessage(null);
+    setTermsError(false);
+
+    if (!agreedTerms.orderTerms || !agreedTerms.privacyTerms) {
+      setTermsError(true);
+      setErrorMessage('주문 및 결제 진행을 위해 필수 약관에 동의해 주세요.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -397,9 +382,10 @@ export default function CheckoutPage() {
         return;
       }
 
+      const formattedOrderId = `FS_${String(orderId).padStart(6, '0')}`;
       const cancelMsg = encodeURIComponent('사용자가 결제를 취소하였습니다');
       router.push(
-        `/checkout/fail?code=USER_CANCEL&message=${cancelMsg}&orderId=${orderId}&amount=${totalAmount}`
+        `/checkout/fail?code=USER_CANCEL&message=${cancelMsg}&orderId=${formattedOrderId}&amount=${totalAmount}`
       );
     } catch (err: any) {
       setErrorMessage(err.message || '모의 결제 실패 처리 중 오류가 발생했습니다.');
@@ -469,10 +455,6 @@ export default function CheckoutPage() {
           <h1 className="text-2xl sm:text-3xl font-black italic text-white tracking-tight">
             주문서 작성 및 결제
           </h1>
-        </div>
-        <div className="flex items-center space-x-2 text-xs text-neutral-400">
-          <Lock className="w-4 h-4 text-[#FFD700]" />
-          <span>SSL 256-bit 안전 결제</span>
         </div>
       </div>
 
@@ -747,41 +729,129 @@ export default function CheckoutPage() {
             </div>
           </div>
 
-          {/* 3. Toss Payments SDK 결제 수단 및 약관 위젯 */}
+          {/* 3. 결제 수단 */}
           <div className="p-6 rounded-2xl bg-[#141414] border border-[#262626] space-y-4 shadow-sm">
             <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
               <div className="flex items-center space-x-2">
                 <CreditCard className="w-4 h-4 text-[#FFD700]" />
-                <h2 className="text-base font-black text-white">결제 수단 및 약관</h2>
+                <h2 className="text-base font-black text-white">결제 수단</h2>
               </div>
-              <span className="text-xs text-neutral-400">Toss Payments SDK v2</span>
+              <span className="text-xs text-neutral-400 font-medium">토스페이먼츠 표준 결제</span>
             </div>
 
-            {/* Toss Payment Method Container */}
-            <div className="relative min-h-[300px] rounded-xl overflow-hidden bg-neutral-950/40 p-2">
-              {isWidgetLoading && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center space-y-3 bg-[#141414]/90 z-10">
-                  <div className="w-7 h-7 border-2 border-[#FFD700] border-t-transparent rounded-full animate-spin" />
-                  <p className="text-xs text-neutral-400 font-medium">
-                    토스페이먼츠 결제 위젯을 불러오는 중입니다...
-                  </p>
+            {/* Selected Single Payment Card */}
+            <div className="rounded-xl border-2 border-[#FFD700] bg-[#1a1a1a] p-4.5 sm:p-5 space-y-3 relative shadow-md shadow-[#FFD700]/5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center space-x-3">
+                  <CheckCircle2 className="w-5 h-5 text-[#FFD700] shrink-0" />
+                  <div className="inline-flex items-center bg-white px-2.5 py-1 rounded-md shadow-sm shrink-0">
+                    <Image
+                      src="/images/toss-payments.png"
+                      alt="Toss Payments"
+                      width={100}
+                      height={24}
+                      className="h-6 w-auto object-contain"
+                    />
+                  </div>
+                  <span className="text-sm sm:text-base font-bold text-white">
+                    신용·체크카드 및 간편결제
+                  </span>
                 </div>
-              )}
-              <div id="payment-method" className="w-full" />
-            </div>
-
-            {/* Toss Agreement Container */}
-            <div className="relative rounded-xl overflow-hidden bg-neutral-950/40 p-2">
-              <div id="agreement" className="w-full" />
-            </div>
-
-            {widgetError && (
-              <div className="p-3.5 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-xs text-yellow-300">
-                ⚠️ 외부 네트워크 상태에 따라 토스 위젯 팝업이 차단된 경우, 우측의{' '}
-                <strong className="text-white font-bold">[모의 결제]</strong> 버튼을 사용하여
-                안전하게 전체 주문/결제 승인 플로우를 검증하실 수 있습니다.
+                <div className="flex flex-wrap items-center gap-1.5 pl-8 sm:pl-0">
+                  <span className="px-2 py-0.5 rounded bg-neutral-800 border border-neutral-700 text-neutral-300 text-[11px] font-medium">
+                    국내외 모든 카드
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-neutral-800 border border-neutral-700 text-neutral-300 text-[11px] font-medium">
+                    토스페이
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-neutral-800 border border-neutral-700 text-neutral-300 text-[11px] font-medium">
+                    카카오페이
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-neutral-800 border border-neutral-700 text-neutral-300 text-[11px] font-medium">
+                    네이버페이
+                  </span>
+                </div>
               </div>
-            )}
+              <p className="text-xs text-neutral-400 pl-8 leading-relaxed">
+                토스페이먼츠 보안 결제창을 통해 카드사 앱카드 및 간편결제로 안전하게 결제됩니다.
+              </p>
+            </div>
+          </div>
+
+          {/* 4. 주문 동의 */}
+          <div
+            className={`p-6 rounded-2xl bg-[#141414] border space-y-4 shadow-sm transition-colors ${
+              termsError
+                ? 'border-rose-500/80 ring-1 ring-rose-500/50'
+                : 'border-[#262626]'
+            }`}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+              <div className="flex items-center space-x-2">
+                <ShieldCheck className="w-4 h-4 text-[#FFD700]" />
+                <h2 className="text-base font-black text-white">주문 동의</h2>
+              </div>
+              {termsError && (
+                <span className="text-xs text-rose-400 font-bold flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  필수 약관에 동의해 주세요
+                </span>
+              )}
+            </div>
+
+            {/* All terms toggle */}
+            <label
+              htmlFor="allTerms"
+              className="flex items-center space-x-3 p-3 rounded-xl bg-neutral-900/90 border border-neutral-800 cursor-pointer hover:border-neutral-700 transition-colors min-h-[44px]"
+            >
+              <input
+                type="checkbox"
+                id="allTerms"
+                checked={agreedTerms.all}
+                onChange={handleAllTermsChange}
+                className="w-4 h-4 rounded border-neutral-700 bg-neutral-950 text-[#FFD700] focus:ring-[#FFD700] accent-[#FFD700]"
+              />
+              <span className="text-sm font-bold text-white">
+                아래 결제 및 개인정보 제공 내용에 모두 동의합니다. (전체 동의)
+              </span>
+            </label>
+
+            {/* Individual required items */}
+            <div className="space-y-2.5 pt-1 pl-1">
+              <label
+                htmlFor="orderTerms"
+                className="flex items-center space-x-3 text-xs text-neutral-300 cursor-pointer hover:text-white transition-colors min-h-[36px]"
+              >
+                <input
+                  type="checkbox"
+                  id="orderTerms"
+                  checked={agreedTerms.orderTerms}
+                  onChange={handleSingleTermChange('orderTerms')}
+                  className="w-4 h-4 rounded border-neutral-700 bg-neutral-950 text-[#FFD700] focus:ring-[#FFD700] accent-[#FFD700] shrink-0"
+                />
+                <span>
+                  <span className="text-[#FFD700] font-bold mr-1">[필수]</span>
+                  주문 상품 정보 및 서비스 이용약관 동의
+                </span>
+              </label>
+
+              <label
+                htmlFor="privacyTerms"
+                className="flex items-center space-x-3 text-xs text-neutral-300 cursor-pointer hover:text-white transition-colors min-h-[36px]"
+              >
+                <input
+                  type="checkbox"
+                  id="privacyTerms"
+                  checked={agreedTerms.privacyTerms}
+                  onChange={handleSingleTermChange('privacyTerms')}
+                  className="w-4 h-4 rounded border-neutral-700 bg-neutral-950 text-[#FFD700] focus:ring-[#FFD700] accent-[#FFD700] shrink-0"
+                />
+                <span>
+                  <span className="text-[#FFD700] font-bold mr-1">[필수]</span>
+                  전자금융거래 기본약관 및 개인정보 제3자 제공 동의 (토스페이먼츠)
+                </span>
+              </label>
+            </div>
           </div>
         </div>
 
@@ -849,12 +919,12 @@ export default function CheckoutPage() {
             </div>
           </div>
 
-          {/* Official CTA Button (min-h-[52px]) */}
+          {/* Official CTA Button (min-h-[56px]) */}
           <button
             type="button"
             onClick={handlePayment}
             disabled={isSubmitting}
-            className="w-full min-h-[52px] rounded-xl bg-[#FFD700] hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-black text-sm transition-all shadow-lg shadow-yellow-500/15 flex items-center justify-center space-x-2 active:scale-[0.99]"
+            className="w-full min-h-[56px] py-4 rounded-xl bg-[#FFD700] hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-black text-base transition-all shadow-lg shadow-yellow-500/15 flex items-center justify-center space-x-2 active:scale-[0.99]"
           >
             {isSubmitting ? (
               <div className="flex items-center space-x-2">
@@ -898,11 +968,6 @@ export default function CheckoutPage() {
                 <span>Mock 실패 취소</span>
               </button>
             </div>
-          </div>
-
-          <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 flex items-center space-x-2 text-[11px] text-neutral-400">
-            <ShieldCheck className="w-4 h-4 text-[#FFD700] shrink-0" />
-            <span>토스페이먼츠 100% 안전 에스크로 결제 보증</span>
           </div>
         </div>
       </div>

@@ -121,6 +121,7 @@ export async function orderRoutes(app: FastifyInstance) {
     }
 
     const { id } = request.params as { id: string };
+    const numericId = id.includes('_') ? id.split('_').pop()! : id;
     const { paymentKey, orderId, amount } = request.body as {
       paymentKey: string;
       orderId: string;
@@ -128,7 +129,7 @@ export async function orderRoutes(app: FastifyInstance) {
     };
 
     const order = await prisma.order.findUnique({
-      where: { id: BigInt(id) },
+      where: { id: BigInt(numericId) },
       include: {
         orderItems: true,
       },
