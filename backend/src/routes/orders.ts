@@ -122,6 +122,9 @@ export async function orderRoutes(app: FastifyInstance) {
 
     const { id } = request.params as { id: string };
     const numericId = id.includes('_') ? id.split('_').pop()! : id;
+    if (!/^\d+$/.test(numericId)) {
+      return reply.status(400).send({ success: false, message: '유효하지 않은 주문 ID 형식입니다.' });
+    }
     const { paymentKey, orderId, amount } = request.body as {
       paymentKey: string;
       orderId: string;

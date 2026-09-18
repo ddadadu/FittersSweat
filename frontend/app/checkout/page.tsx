@@ -19,9 +19,7 @@ import {
   User,
   MapPin,
   Sparkles,
-  Lock,
   ChevronLeft,
-  Check,
   Search,
   CheckCircle2,
 } from 'lucide-react';
@@ -820,7 +818,7 @@ export default function CheckoutPage() {
             <div className="space-y-2.5 pt-1 pl-1">
               <label
                 htmlFor="orderTerms"
-                className="flex items-center space-x-3 text-xs text-neutral-300 cursor-pointer hover:text-white transition-colors min-h-[36px]"
+                className="flex items-center space-x-3 text-xs text-neutral-300 cursor-pointer hover:text-white transition-colors min-h-[44px]"
               >
                 <input
                   type="checkbox"
@@ -837,7 +835,7 @@ export default function CheckoutPage() {
 
               <label
                 htmlFor="privacyTerms"
-                className="flex items-center space-x-3 text-xs text-neutral-300 cursor-pointer hover:text-white transition-colors min-h-[36px]"
+                className="flex items-center space-x-3 text-xs text-neutral-300 cursor-pointer hover:text-white transition-colors min-h-[44px]"
               >
                 <input
                   type="checkbox"

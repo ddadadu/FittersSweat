@@ -38,7 +38,8 @@ function FailContent() {
           const ordersRes = await fetchApi<{
             orders: Array<{ id: string; totalAmount: number }>;
           }>('/api/v1/orders');
-          const found = ordersRes.orders?.find((o) => o.id === orderId);
+          const rawId = orderId && orderId.includes('_') ? orderId.split('_').pop()! : orderId;
+          const found = ordersRes.orders?.find((o) => o.id === orderId || (rawId && o.id === rawId));
           if (found) {
             orderAmount = found.totalAmount;
           }

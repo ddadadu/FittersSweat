@@ -57,7 +57,7 @@ export async function confirmTossPayment(
       // because public sample keys cannot execute server-side confirmation without personal developer credentials.
       if (
         process.env.NODE_ENV !== 'production' &&
-        (json.code === 'UNAUTHORIZED_KEY' || json.code === 'NOT_FOUND_PAYMENT')
+        json.code === 'UNAUTHORIZED_KEY'
       ) {
         return {
           success: true,

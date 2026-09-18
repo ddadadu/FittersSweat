@@ -63,17 +63,24 @@ function SuccessContent() {
           }),
         });
 
+        // Fix 5: Clear cart immediately upon successful payment response
+        useCartStore.getState().clearCart();
         if (isMountedRef.current) {
-          useCartStore.getState().clearCart();
           setApprovedDate(new Date().toLocaleString('ko-KR'));
           setStatus('success');
         }
       } catch (err: any) {
         const msg = err.message || '';
-        // Defensive handling: If already paid, order is successfully completed!
-        if (msg.includes('paid') || msg.includes('이미') || msg.includes('결제할 수 없는 주문 상태')) {
+        // Fix 1: Only treat as already_paid if genuinely paid (exclude cancelled orders)
+        const isAlreadyPaid =
+          (msg.includes('paid') && !msg.includes('cancelled')) ||
+          msg.includes('already paid') ||
+          msg.includes('이미 결제') ||
+          msg.includes('주문 상태입니다: paid');
+
+        if (isAlreadyPaid) {
+          useCartStore.getState().clearCart();
           if (isMountedRef.current) {
-            useCartStore.getState().clearCart();
             setApprovedDate(new Date().toLocaleString('ko-KR'));
             setStatus('already_paid');
           }
