@@ -23,11 +23,15 @@ describe('Orders & Toss Payments API (/api/v1/orders)', () => {
     });
     authToken = JSON.parse(loginRes.payload).accessToken;
 
-    // 테스트용 상품 확인 또는 생성
+    // 테스트용 상품 확인 또는 생성 (테스트 전 재고 최소 50개 확보)
     const product = await prisma.product.findFirst();
     if (product) {
-      testProductId = product.id.toString();
-      initialStock = product.stockQuantity;
+      const refreshed = await prisma.product.update({
+        where: { id: product.id },
+        data: { stockQuantity: Math.max(product.stockQuantity, 50) },
+      });
+      testProductId = refreshed.id.toString();
+      initialStock = refreshed.stockQuantity;
     }
   });
 
@@ -204,5 +208,73 @@ describe('Orders & Toss Payments API (/api/v1/orders)', () => {
     });
     expect(failRes.success).toBe(false);
     expect(failRes.error).toBeDefined();
+  });
+
+  it('POST /api/v1/orders with shipping, GET /:id, and PATCH /:id/shipping', async () => {
+    // 1. 주문 생성 with 배송지
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/orders',
+      headers: { authorization: `Bearer ${authToken}` },
+      payload: {
+        items: [{ productId: testProductId, quantity: 1 }],
+        recipientName: '홍길동',
+        recipientPhone: '01012345678',
+        postcode: '06000',
+        address: '서울시 강남구 테헤란로 1',
+        addressDetail: '101호',
+      },
+    });
+
+    expect(createRes.statusCode).toBe(201);
+    const created = JSON.parse(createRes.payload).order;
+    const orderId = created.id;
+    expect(created.recipientName).toBe('홍길동');
+
+    // 2. 단건 조회
+    const getRes = await app.inject({
+      method: 'GET',
+      url: `/api/v1/orders/${orderId}`,
+      headers: { authorization: `Bearer ${authToken}` },
+    });
+    expect(getRes.statusCode).toBe(200);
+    const fetched = JSON.parse(getRes.payload).order;
+    expect(fetched.id).toBe(orderId);
+    expect(fetched.recipientName).toBe('홍길동');
+    expect(fetched.postcode).toBe('06000');
+    expect(fetched.orderItems.length).toBe(1);
+
+    // 3. 배송지 수정 (pending 상태)
+    const patchRes = await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/orders/${orderId}/shipping`,
+      headers: { authorization: `Bearer ${authToken}` },
+      payload: {
+        recipientName: '김철수',
+        recipientPhone: '01098765432',
+        addressDetail: '202호',
+      },
+    });
+    expect(patchRes.statusCode).toBe(200);
+    const patched = JSON.parse(patchRes.payload).order;
+    expect(patched.recipientName).toBe('김철수');
+    expect(patched.recipientPhone).toBe('01098765432');
+    expect(patched.addressDetail).toBe('202호');
+    expect(patched.postcode).toBe('06000'); // 기존 값 보존
+
+    // 4. 상태를 shipped로 변경 후 배송지 수정 시도 -> 거부 (400)
+    await prisma.order.update({
+      where: { id: BigInt(orderId) },
+      data: { status: 'shipped' },
+    });
+
+    const rejectRes = await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/orders/${orderId}/shipping`,
+      headers: { authorization: `Bearer ${authToken}` },
+      payload: { recipientName: '이영희' },
+    });
+    expect(rejectRes.statusCode).toBe(400);
+    expect(JSON.parse(rejectRes.payload).message).toContain('배송이 시작된 후');
   });
 });

@@ -3,13 +3,18 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { X, User, Lock, AlertCircle, CheckCircle2, Save } from 'lucide-react';
+import { X, User, Lock, AlertCircle, CheckCircle2, Save, Phone, MapPin, Search } from 'lucide-react';
+import { openDaumPostcodePopup } from '@/lib/daumPostcode';
 
 interface EditProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentName?: string;
   currentEmail?: string;
+  currentPhone?: string | null;
+  currentPostcode?: string | null;
+  currentAddress?: string | null;
+  currentAddressDetail?: string | null;
 }
 
 export default function EditProfileModal({
@@ -17,10 +22,18 @@ export default function EditProfileModal({
   onClose,
   currentName = '',
   currentEmail = '',
+  currentPhone = '',
+  currentPostcode = '',
+  currentAddress = '',
+  currentAddressDetail = '',
 }: EditProfileModalProps) {
   const { updateProfile } = useAuthStore();
 
   const [name, setName] = useState(currentName);
+  const [phone, setPhone] = useState(currentPhone || '');
+  const [postcode, setPostcode] = useState(currentPostcode || '');
+  const [address, setAddress] = useState(currentAddress || '');
+  const [addressDetail, setAddressDetail] = useState(currentAddressDetail || '');
   const [changePassword, setChangePassword] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -32,6 +45,10 @@ export default function EditProfileModal({
   useEffect(() => {
     if (isOpen) {
       setName(currentName);
+      setPhone(currentPhone || '');
+      setPostcode(currentPostcode || '');
+      setAddress(currentAddress || '');
+      setAddressDetail(currentAddressDetail || '');
       setChangePassword(false);
       setCurrentPassword('');
       setNewPassword('');
@@ -39,7 +56,18 @@ export default function EditProfileModal({
       setErrorMessage(null);
       setSuccessMessage(null);
     }
-  }, [isOpen, currentName]);
+  }, [isOpen, currentName, currentPhone, currentPostcode, currentAddress, currentAddressDetail]);
+
+  const handleSearchAddress = async () => {
+    try {
+      await openDaumPostcodePopup((result) => {
+        setPostcode(result.zonecode);
+        setAddress(result.fullAddress);
+      });
+    } catch (err: any) {
+      console.error('Daum postcode popup error:', err);
+    }
+  };
 
   // Lock body scroll and handle Escape key
   useEffect(() => {
@@ -90,6 +118,10 @@ export default function EditProfileModal({
       setIsSubmitting(true);
       await updateProfile({
         name: name.trim(),
+        phone: phone.trim() || null,
+        postcode: postcode.trim() || null,
+        address: address.trim() || null,
+        addressDetail: addressDetail.trim() || null,
         ...(changePassword ? { currentPassword, newPassword } : {}),
       });
 
@@ -140,13 +172,13 @@ export default function EditProfileModal({
               <X className="w-5 h-5" />
             </button>
 
-            {/* Header */}
+              {/* Header */}
             <div className="mb-6">
               <h2 id="edit-profile-title" className="text-xl font-black text-white tracking-tight">
                 내 정보 수정
               </h2>
               <p className="text-xs text-[#A3A3A3] mt-1">
-                프로필 이름 및 계정 비밀번호를 변경할 수 있습니다.
+                프로필 정보(이름, 연락처, 기본 배송지) 및 비밀번호를 관리합니다.
               </p>
             </div>
 
@@ -202,6 +234,66 @@ export default function EditProfileModal({
                   />
                   <User className="w-4 h-4 text-neutral-500 absolute left-3.5 top-3 pointer-events-none" />
                 </div>
+              </div>
+
+              {/* Phone */}
+              <div>
+                <label htmlFor="edit-phone" className="block text-xs font-semibold text-neutral-400 mb-1.5">
+                  전화번호
+                </label>
+                <div className="relative">
+                  <input
+                    type="tel"
+                    id="edit-phone"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="010-1234-5678"
+                    className="w-full bg-neutral-900 border border-neutral-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#FFD700] transition-colors"
+                  />
+                  <Phone className="w-4 h-4 text-neutral-500 absolute left-3.5 top-3 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Shipping Address */}
+              <div className="space-y-2">
+                <label className="block text-xs font-semibold text-neutral-400">
+                  기본 배송지 <span className="text-[#A3A3A3] font-normal">(결제 시 주문서에 자동 입력)</span>
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={postcode}
+                    placeholder="우편번호"
+                    className="w-32 bg-[#1F1F1F] border border-neutral-700 rounded-xl px-3.5 py-2.5 text-sm text-white cursor-default focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSearchAddress}
+                    className="min-h-[44px] px-3.5 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-xs font-bold text-neutral-200 transition-colors flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFD700]"
+                  >
+                    <Search className="w-3.5 h-3.5 text-[#FFD700]" />
+                    <span>우편번호 검색</span>
+                  </button>
+                </div>
+                <div className="relative">
+                  <input
+                    type="text"
+                    readOnly
+                    value={address}
+                    placeholder="주소 검색 버튼을 클릭하세요"
+                    onClick={handleSearchAddress}
+                    className="w-full bg-[#1F1F1F] border border-neutral-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white cursor-pointer focus:outline-none focus:border-[#FFD700] transition-colors"
+                  />
+                  <MapPin className="w-4 h-4 text-neutral-500 absolute left-3.5 top-3 pointer-events-none" />
+                </div>
+                <input
+                  type="text"
+                  value={addressDetail}
+                  onChange={(e) => setAddressDetail(e.target.value)}
+                  placeholder="상세주소 입력 (예: 101동 1202호)"
+                  className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#FFD700] transition-colors"
+                />
               </div>
 
               {/* Password Change Toggle */}

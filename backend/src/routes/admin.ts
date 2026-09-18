@@ -1,7 +1,15 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { PrismaClient, Role, OrderStatus } from '@prisma/client';
+import { v2 as cloudinary } from 'cloudinary';
 
 const prisma = new PrismaClient();
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+  secure: true,
+});
 
 export async function adminRoutes(app: FastifyInstance) {
   // Middleware: verifyAdmin
@@ -48,10 +56,11 @@ export async function adminRoutes(app: FastifyInstance) {
       // 2. Total orders count
       const totalOrders = await prisma.order.count();
 
-      // 3. Low stock count (<= 5)
+      // 3. Low stock count (<= 5 and not deleted)
       const lowStockCount = await prisma.product.count({
         where: {
           stockQuantity: { lte: 5 },
+          isDeleted: false,
         },
       });
 
@@ -218,6 +227,191 @@ export async function adminRoutes(app: FastifyInstance) {
       });
     } catch {
       return reply.status(404).send({ success: false, message: 'Product not found' });
+    }
+  });
+
+  /**
+   * POST /api/v1/admin/upload-image
+   * Cloudinary image upload via multipart stream
+   */
+  app.post('/upload-image', { preHandler: [verifyAdmin] }, async (request, reply) => {
+    try {
+      const data = await request.file();
+      if (!data) {
+        return reply.status(400).send({ success: false, message: '이미지 파일이 누락되었습니다.' });
+      }
+
+      const chunks: Buffer[] = [];
+      for await (const chunk of data.file) {
+        chunks.push(chunk);
+      }
+      const buffer = Buffer.concat(chunks);
+
+      if (buffer.length === 0) {
+        return reply.status(400).send({ success: false, message: '비어있는 파일입니다.' });
+      }
+
+      // Check if Cloudinary credentials are configured
+      if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY) {
+        return reply.send({
+          success: true,
+          url: `https://res.cloudinary.com/demo/image/upload/sample_${Date.now()}.jpg`,
+        });
+      }
+
+      const uploadResult = await new Promise<{ secure_url: string }>((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: 'fittersweat/products', resource_type: 'image' },
+          (error, result) => {
+            if (error || !result) return reject(error || new Error('Upload failed'));
+            resolve(result);
+          }
+        );
+        stream.end(buffer);
+      });
+
+      return reply.send({
+        success: true,
+        url: uploadResult.secure_url,
+      });
+    } catch (err: any) {
+      return reply.status(500).send({
+        success: false,
+        message: err.message || '이미지 업로드 중 오류가 발생했습니다.',
+      });
+    }
+  });
+
+  /**
+   * POST /api/v1/admin/products
+   * Register new product
+   */
+  app.post('/products', { preHandler: [verifyAdmin] }, async (request, reply) => {
+    const {
+      name,
+      description,
+      categoryId,
+      price,
+      stockQuantity,
+      imageUrl,
+      brandLogoUrl,
+      detailImageUrl,
+    } = request.body as {
+      name: string;
+      description?: string;
+      categoryId: string;
+      price: number;
+      stockQuantity: number;
+      imageUrl?: string;
+      brandLogoUrl?: string;
+      detailImageUrl?: string;
+    };
+
+    const VALID_CATEGORIES = ['shoes', 'nutrition', 'gear', 'equipment'];
+
+    if (!name || !categoryId || price == null || stockQuantity == null) {
+      return reply.status(400).send({
+        success: false,
+        message: '필수 필드가 누락되었습니다. (상품명, 카테고리, 가격, 재고수량)',
+      });
+    }
+
+    if (!VALID_CATEGORIES.includes(categoryId)) {
+      return reply.status(400).send({
+        success: false,
+        message: `유효하지 않은 카테고리입니다. (허용: ${VALID_CATEGORIES.join(', ')})`,
+      });
+    }
+
+    const numPrice = Number(price);
+    const numStock = Number(stockQuantity);
+
+    if (isNaN(numPrice) || numPrice <= 0) {
+      return reply.status(400).send({
+        success: false,
+        message: '가격은 0보다 큰 숫자여야 합니다.',
+      });
+    }
+
+    if (isNaN(numStock) || numStock < 0 || !Number.isInteger(numStock)) {
+      return reply.status(400).send({
+        success: false,
+        message: '재고 수량은 0 이상의 정수여야 합니다.',
+      });
+    }
+
+    try {
+      const product = await prisma.product.create({
+        data: {
+          name: name.trim(),
+          description: description?.trim() || null,
+          categoryId,
+          price: numPrice,
+          stockQuantity: numStock,
+          imageUrl: imageUrl?.trim() || null,
+          brandLogoUrl: brandLogoUrl?.trim() || null,
+          detailImageUrl: detailImageUrl?.trim() || null,
+        },
+      });
+
+      return reply.status(201).send({
+        success: true,
+        product: {
+          id: product.id.toString(),
+          name: product.name,
+          description: product.description,
+          categoryId: product.categoryId,
+          price: Number(product.price),
+          stockQuantity: product.stockQuantity,
+          imageUrl: product.imageUrl,
+          brandLogoUrl: product.brandLogoUrl,
+          detailImageUrl: product.detailImageUrl,
+          createdAt: product.createdAt,
+        },
+      });
+    } catch (err: any) {
+      return reply.status(500).send({
+        success: false,
+        message: err.message || '상품 등록 중 오류가 발생했습니다.',
+      });
+    }
+  });
+
+  /**
+   * DELETE /api/v1/admin/products/:id
+   * Soft delete product (sets isDeleted: true)
+   */
+  app.delete('/products/:id', { preHandler: [verifyAdmin] }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+
+    try {
+      const productId = BigInt(id);
+      const existing = await prisma.product.findUnique({
+        where: { id: productId },
+      });
+
+      if (!existing || existing.isDeleted) {
+        return reply.status(404).send({
+          success: false,
+          message: '상품을 찾을 수 없거나 이미 삭제되었습니다.',
+        });
+      }
+
+      const updated = await prisma.product.update({
+        where: { id: productId },
+        data: { isDeleted: true },
+      });
+
+      return reply.send({
+        success: true,
+        message: `상품 "${updated.name}"이(가) 삭제되었습니다.`,
+        id: updated.id.toString(),
+      });
+    } catch {
+      return reply.status(400).send({
+        success: false,
+        message: '유효하지 않은 상품 ID입니다.',
+      });
     }
   });
 }

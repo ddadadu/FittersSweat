@@ -199,6 +199,45 @@ describe('Auth API (/api/v1/auth)', () => {
     expect(body.user.name).toBe('새로운이름');
   });
 
+  it('PATCH /api/v1/auth/me - should update user phone and address info', async () => {
+    const loginRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/login',
+      payload: { email: testUser.email, password: testUser.password },
+    });
+    const token = JSON.parse(loginRes.payload).accessToken;
+
+    const patchRes = await app.inject({
+      method: 'PATCH',
+      url: '/api/v1/auth/me',
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        phone: '010-1234-5678',
+        postcode: '06000',
+        address: '서울시 강남구 테헤란로 123',
+        addressDetail: '피터스웨트빌딩 501호',
+      },
+    });
+
+    expect(patchRes.statusCode).toBe(200);
+    const body = JSON.parse(patchRes.payload);
+    expect(body.success).toBe(true);
+    expect(body.user.phone).toBe('010-1234-5678');
+    expect(body.user.postcode).toBe('06000');
+    expect(body.user.address).toBe('서울시 강남구 테헤란로 123');
+    expect(body.user.addressDetail).toBe('피터스웨트빌딩 501호');
+
+    const getRes = await app.inject({
+      method: 'GET',
+      url: '/api/v1/auth/me',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(getRes.statusCode).toBe(200);
+    const getBody = JSON.parse(getRes.payload);
+    expect(getBody.user.phone).toBe('010-1234-5678');
+    expect(getBody.user.address).toBe('서울시 강남구 테헤란로 123');
+  });
+
   it('PATCH /api/v1/auth/me - should fail password change if current password is wrong', async () => {
     const loginRes = await app.inject({
       method: 'POST',

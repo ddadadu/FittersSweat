@@ -27,6 +27,8 @@ import {
   LogOut,
   Trash2,
   LogIn,
+  Phone,
+  MapPin,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { showToast } from '@/stores/useToastStore';
@@ -39,6 +41,10 @@ interface UserProfile {
   name: string;
   role: string;
   createdAt: string;
+  phone?: string | null;
+  postcode?: string | null;
+  address?: string | null;
+  addressDetail?: string | null;
 }
 
 interface OrderProduct {
@@ -404,6 +410,26 @@ export default function MyPage() {
                     <span>가입일: {joinDate}</span>
                   </span>
                 </div>
+
+                {/* Contact & Shipping Info */}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-[#A3A3A3] pt-0.5">
+                  <span className="flex items-center gap-1.5 text-neutral-300">
+                    <Phone className="w-3.5 h-3.5 text-[#FFD700] shrink-0" />
+                    <span>{user?.phone || '연락처 미등록'}</span>
+                  </span>
+                  <span className="hidden sm:inline text-[#333333]">&bull;</span>
+                  <span
+                    className="flex items-center gap-1.5 text-neutral-300 truncate max-w-sm sm:max-w-md"
+                    title={user?.address ? `[${user.postcode || ''}] ${user.address} ${user.addressDetail || ''}` : '배송지 미등록'}
+                  >
+                    <MapPin className="w-3.5 h-3.5 text-[#FFD700] shrink-0" />
+                    <span className="truncate">
+                      {user?.address
+                        ? `[${user.postcode || '-'}] ${user.address} ${user.addressDetail || ''}`
+                        : '기본 배송지 미등록 (내 정보 수정에서 등록)'}
+                    </span>
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -662,9 +688,18 @@ export default function MyPage() {
                           <span>{formatDateTime(order.createdAt)}</span>
                         </span>
                       </div>
-                      <span className={`text-xs font-bold px-3 py-1 rounded-full border ${badge.classes}`}>
-                        {badge.label}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-bold px-3 py-1 rounded-full border ${badge.classes}`}>
+                          {badge.label}
+                        </span>
+                        <Link
+                          href={`/orders/${order.id}`}
+                          className="text-xs font-bold px-2.5 py-1 rounded-full bg-neutral-800 hover:bg-neutral-700 text-[#FFD700] border border-neutral-700 hover:border-[#FFD700]/50 transition-colors inline-flex items-center gap-1"
+                        >
+                          <span>상세 보기</span>
+                          <ChevronRight className="w-3 h-3" />
+                        </Link>
+                      </div>
                     </div>
 
                     {/* Ordered Items (defensive mapping) */}
@@ -883,6 +918,10 @@ export default function MyPage() {
         }}
         currentName={userName}
         currentEmail={userEmail}
+        currentPhone={user?.phone || ''}
+        currentPostcode={user?.postcode || ''}
+        currentAddress={user?.address || ''}
+        currentAddressDetail={user?.addressDetail || ''}
       />
 
       {/* Delete Account Modal */}

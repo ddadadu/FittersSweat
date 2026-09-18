@@ -34,6 +34,10 @@ model User {
   passwordHash     String            @map("password_hash") @db.VarChar(255)
   name             String            @db.VarChar(100)
   role             Role              @default(USER)
+  phone            String?           @db.VarChar(20)
+  postcode         String?           @db.VarChar(10)
+  address          String?           @db.VarChar(255)
+  addressDetail    String?           @map("address_detail") @db.VarChar(255)
   createdAt        DateTime          @default(now()) @map("created_at")
   updatedAt        DateTime          @updatedAt @map("updated_at")
   orders           Order[]
@@ -84,6 +88,7 @@ model Product {
   brandLogoUrl   String?          @map("brand_logo_url") @db.VarChar(500)
   detailImageUrl String?          @map("detail_image_url") @db.VarChar(500)
   embedding      Unsupported("vector(768)")?
+  isDeleted      Boolean          @default(false) @map("is_deleted")
   createdAt     DateTime         @default(now()) @map("created_at")
   updatedAt     DateTime         @updatedAt @map("updated_at")
   orderItems    OrderItem[]
@@ -100,6 +105,11 @@ model Order {
   totalAmount Decimal     @map("total_amount") @db.Decimal(12, 2)
   paymentKey  String?     @map("payment_key") @db.VarChar(255)
   paidAt      DateTime?   @map("paid_at")
+  recipientName   String?  @map("recipient_name")   @db.VarChar(100)
+  recipientPhone  String?  @map("recipient_phone")  @db.VarChar(20)
+  postcode        String?  @db.VarChar(10)
+  address         String?  @db.VarChar(255)
+  addressDetail   String?  @map("address_detail")   @db.VarChar(255)
   createdAt   DateTime    @default(now()) @map("created_at")
   updatedAt   DateTime    @updatedAt @map("updated_at")
   user        User        @relation(fields: [userId], references: [id])

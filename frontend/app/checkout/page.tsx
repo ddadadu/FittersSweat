@@ -18,12 +18,12 @@ import {
   Truck,
   User,
   MapPin,
-  Sparkles,
   ChevronLeft,
   Search,
   CheckCircle2,
 } from 'lucide-react';
 import { openDaumPostcodePopup, loadDaumPostcodeScript } from '@/lib/daumPostcode';
+import { showToast } from '@/stores/useToastStore';
 
 interface OrderFormState {
   ordererName: string;
@@ -44,6 +44,7 @@ export default function CheckoutPage() {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const { items, getTotalAmount } = useCartStore();
+  const { user: storeUser, isAuthenticated } = useAuthStore();
 
   const [form, setForm] = useState<OrderFormState>({
     ordererName: '',
@@ -69,6 +70,73 @@ export default function CheckoutPage() {
   const [termsError, setTermsError] = useState(false);
 
   const totalAmount = getTotalAmount();
+
+  // Pre-fill basic orderer info if user is already logged in
+  useEffect(() => {
+    if (storeUser) {
+      setForm((prev) => ({
+        ...prev,
+        ordererName: prev.ordererName || storeUser.name || '',
+        ordererEmail: prev.ordererEmail || storeUser.email || '',
+        ordererPhone: prev.ordererPhone || storeUser.phone || '',
+      }));
+    }
+  }, [storeUser]);
+
+  const handleFillFromMyInfo = async () => {
+    let currentUser = storeUser;
+    try {
+      const res = await fetchApi<{ success: boolean; user: any }>('/api/v1/auth/me');
+      if (res?.user) {
+        currentUser = res.user;
+      }
+    } catch {
+      // ignore network errors and fallback to storeUser
+    }
+
+    if (!currentUser) {
+      showToast('로그인 후 이용 가능한 기능입니다.', 'warning');
+      return;
+    }
+
+    setForm((prev) => {
+      const next = { ...prev };
+      if (currentUser.name) next.ordererName = currentUser.name;
+      if (currentUser.phone) next.ordererPhone = currentUser.phone;
+      if (currentUser.email) next.ordererEmail = currentUser.email;
+
+      if (currentUser.address) {
+        next.postcode = currentUser.postcode || '';
+        next.shippingAddress = currentUser.address || '';
+        next.shippingDetailAddress = currentUser.addressDetail || '';
+        if (!next.recipientName) next.recipientName = currentUser.name || '';
+        if (!next.recipientPhone) next.recipientPhone = currentUser.phone || '';
+      }
+      return next;
+    });
+
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      if (currentUser.name) delete next.ordererName;
+      if (currentUser.phone) delete next.ordererPhone;
+      if (currentUser.email) delete next.ordererEmail;
+      if (currentUser.address) {
+        delete next.postcode;
+        delete next.shippingAddress;
+        if (currentUser.name) delete next.recipientName;
+        if (currentUser.phone) delete next.recipientPhone;
+      }
+      return next;
+    });
+
+    if (!currentUser.phone && !currentUser.address) {
+      showToast('주문자 정보가 입력되었습니다. 마이페이지에서 연락처와 기본 배송지를 등록해 보세요.', 'info');
+    } else if (!currentUser.address) {
+      showToast('주문자 정보가 입력되었습니다. 배송지는 마이페이지에서 등록하거나 직접 입력할 수 있습니다.', 'info');
+    } else {
+      showToast('내 정보(주문자 및 기본 배송지)가 성공적으로 입력되었습니다.', 'success');
+    }
+  };
 
   // 1. Mount & Auth Guard: Ensure valid token exists; auto-refresh if expired; preload Daum Postcode script
   useEffect(() => {
@@ -238,6 +306,11 @@ export default function CheckoutPage() {
           productId: i.productId,
           quantity: i.quantity,
         })),
+        recipientName: form.recipientName || form.ordererName,
+        recipientPhone: form.recipientPhone || form.ordererPhone,
+        postcode: form.postcode,
+        address: form.shippingAddress,
+        addressDetail: form.shippingDetailAddress,
       };
 
       const res = await fetchApi<{
@@ -327,67 +400,6 @@ export default function CheckoutPage() {
         setErrorMessage(msg);
         setIsSubmitting(false);
       }
-    }
-  };
-
-  // 2. Mock Test Success Flow (for test automation / restricted popup environments)
-  const handleMockSuccess = async () => {
-    setErrorMessage(null);
-    setTermsError(false);
-
-    if (!agreedTerms.orderTerms || !agreedTerms.privacyTerms) {
-      setTermsError(true);
-      setErrorMessage('주문 및 결제 진행을 위해 필수 약관에 동의해 주세요.');
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const orderId = await validateAndCreateOrder();
-      if (!orderId) {
-        setIsSubmitting(false);
-        return;
-      }
-
-      const formattedOrderId = `FS_${String(orderId).padStart(6, '0')}`;
-      router.push(
-        `/checkout/success?paymentKey=test_mock_success_key&orderId=${formattedOrderId}&amount=${totalAmount}`
-      );
-    } catch (err: any) {
-      setErrorMessage(err.message || '모의 결제 처리 중 오류가 발생했습니다.');
-      setIsSubmitting(false);
-    }
-  };
-
-  // 3. Mock Test Fail Flow (for test automation / rollback validation)
-  const handleMockFail = async () => {
-    setErrorMessage(null);
-    setTermsError(false);
-
-    if (!agreedTerms.orderTerms || !agreedTerms.privacyTerms) {
-      setTermsError(true);
-      setErrorMessage('주문 및 결제 진행을 위해 필수 약관에 동의해 주세요.');
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const orderId = await validateAndCreateOrder();
-      if (!orderId) {
-        setIsSubmitting(false);
-        return;
-      }
-
-      const formattedOrderId = `FS_${String(orderId).padStart(6, '0')}`;
-      const cancelMsg = encodeURIComponent('사용자가 결제를 취소하였습니다');
-      router.push(
-        `/checkout/fail?code=USER_CANCEL&message=${cancelMsg}&orderId=${formattedOrderId}&amount=${totalAmount}`
-      );
-    } catch (err: any) {
-      setErrorMessage(err.message || '모의 결제 실패 처리 중 오류가 발생했습니다.');
-      setIsSubmitting(false);
     }
   };
 
@@ -482,9 +494,19 @@ export default function CheckoutPage() {
         <div className="lg:col-span-2 space-y-6">
           {/* 1. 주문자 정보 (Review Finding #6: id, htmlFor, aria-label) */}
           <div className="p-6 rounded-2xl bg-[#141414] border border-[#262626] space-y-4 shadow-sm">
-            <div className="flex items-center space-x-2 pb-3 border-b border-neutral-800">
-              <User className="w-4 h-4 text-[#FFD700]" />
-              <h2 className="text-base font-black text-white">주문자 정보</h2>
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+              <div className="flex items-center space-x-2">
+                <User className="w-4 h-4 text-[#FFD700]" />
+                <h2 className="text-base font-black text-white">주문자 정보</h2>
+              </div>
+              <button
+                type="button"
+                onClick={handleFillFromMyInfo}
+                className="inline-flex items-center px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-[#FFD700] text-neutral-300 hover:text-black border border-neutral-700 hover:border-[#FFD700] text-xs font-bold transition-all shadow-sm active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFD700]"
+                title="내 프로필 정보(이름, 연락처, 기본 배송지)를 주문서에 자동 입력합니다."
+              >
+                내 정보와 동일
+              </button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -936,37 +958,6 @@ export default function CheckoutPage() {
               </>
             )}
           </button>
-
-          {/* Mock Test Options Section */}
-          <div className="p-4 rounded-xl bg-neutral-900/80 border border-neutral-800 space-y-3 text-xs">
-            <div className="flex items-center space-x-1.5 text-neutral-300 font-bold">
-              <Sparkles className="w-3.5 h-3.5 text-[#FFD700]" />
-              <span>테스트 & 브라우저 자동화 전용 결제</span>
-            </div>
-            <p className="text-[11px] text-neutral-400 leading-relaxed">
-              Toss 결제창 팝업 제한 환경 또는 E2E 자동화 테스트 시에도 즉각 검증할 수
-              있도록 모의 결제 액션을 제공합니다.
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-              <button
-                type="button"
-                onClick={handleMockSuccess}
-                disabled={isSubmitting}
-                className="min-h-[44px] px-3 py-2 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 font-bold text-xs transition-colors flex items-center justify-center space-x-1 disabled:opacity-50 active:scale-[0.98]"
-              >
-                <span>Mock 성공 승인</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleMockFail}
-                disabled={isSubmitting}
-                className="min-h-[44px] px-3 py-2 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-400 font-bold text-xs transition-colors flex items-center justify-center space-x-1 disabled:opacity-50 active:scale-[0.98]"
-              >
-                <span>Mock 실패 취소</span>
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>

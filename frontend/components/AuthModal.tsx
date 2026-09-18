@@ -433,8 +433,8 @@ export default function AuthModal() {
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="relative flex-1">
+                  <div className="flex items-center gap-2 w-full">
+                    <div className="relative flex-1 min-w-0">
                       <input
                         type="email"
                         id="signup-email"
@@ -447,13 +447,13 @@ export default function AuthModal() {
                           if (isOtpSent) resetOtpState();
                         }}
                         placeholder="runner@example.com"
-                        className={`w-full bg-neutral-900 border rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none transition-colors ${
+                        className={`w-full h-11 bg-neutral-900 border rounded-xl pl-10 pr-3 text-sm text-white focus:outline-none transition-colors ${
                           isEmailVerified
                             ? 'border-emerald-500/50 bg-emerald-500/5 text-emerald-200 cursor-not-allowed'
                             : 'border-neutral-700 focus:border-[#FFD700]'
                         }`}
                       />
-                      <Mail className={`w-4 h-4 absolute left-3.5 top-3 pointer-events-none ${
+                      <Mail className={`w-4 h-4 absolute left-3.5 top-3.5 pointer-events-none ${
                         isEmailVerified ? 'text-emerald-400' : 'text-neutral-500'
                       }`} />
                     </div>
@@ -462,7 +462,7 @@ export default function AuthModal() {
                         type="button"
                         onClick={handleSendOtp}
                         disabled={isSendingOtp || !email.trim()}
-                        className="min-h-[42px] px-3.5 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 hover:border-[#FFD700] text-xs font-bold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0 flex items-center space-x-1.5"
+                        className="h-11 px-3.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 hover:border-[#FFD700] text-xs font-bold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0 whitespace-nowrap flex items-center space-x-1.5 active:scale-[0.98]"
                       >
                         {isSendingOtp ? (
                           <>
@@ -483,30 +483,47 @@ export default function AuthModal() {
                 </div>
 
                 {/* 6-Digit OTP Verification Field */}
-                {isOtpSent && !isEmailVerified && (
-                  <div className="p-3.5 rounded-xl bg-neutral-900/90 border border-neutral-800 space-y-2.5 animate-fadeIn">
+                {!isEmailVerified && (
+                  <div className={`p-3.5 rounded-xl border space-y-2.5 w-full transition-all ${
+                    isOtpSent
+                      ? 'bg-neutral-900/90 border-neutral-700 shadow-inner animate-fadeIn'
+                      : 'bg-neutral-900/40 border-dashed border-neutral-800 opacity-70'
+                  }`}>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-neutral-300">인증 코드 6자리</span>
-                      <span className="flex items-center space-x-1 text-[11px] font-mono font-bold text-[#FFD700]">
-                        <Clock className="w-3 h-3" />
-                        <span>{formatTimer(otpTimer)}</span>
+                      <span className="font-semibold text-neutral-300">
+                        인증 코드 6자리 {isOtpSent ? <span className="text-[#FFD700]">*</span> : <span className="text-neutral-500 font-normal">(발송 후 입력)</span>}
                       </span>
+                      {isOtpSent && (
+                        <span className="flex items-center space-x-1 text-[11px] font-mono font-bold text-[#FFD700] bg-[#FFD700]/10 px-2 py-0.5 rounded-md border border-[#FFD700]/30">
+                          <Clock className="w-3 h-3" />
+                          <span>{formatTimer(otpTimer)}</span>
+                        </span>
+                      )}
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="text"
-                        maxLength={6}
-                        value={otpCode}
-                        onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
-                        placeholder="6자리 숫자"
-                        className="flex-1 bg-black/60 border border-neutral-700 rounded-xl px-4 py-2 text-sm text-center text-white tracking-[0.3em] font-mono font-bold focus:outline-none focus:border-[#FFD700] transition-colors"
-                        aria-label="이메일 6자리 인증코드 입력"
-                      />
+                    <div className="flex items-center gap-2 w-full">
+                      <div className="relative flex-1 min-w-0">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          maxLength={6}
+                          disabled={!isOtpSent}
+                          value={otpCode}
+                          onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
+                          placeholder={isOtpSent ? "6자리 숫자 입력" : "먼저 [인증번호 발송]을 눌러주세요"}
+                          className={`w-full h-11 rounded-xl px-3 text-sm text-center font-mono font-bold transition-all outline-none ${
+                            isOtpSent
+                              ? 'bg-black/70 border border-neutral-700 text-white tracking-[0.25em] focus:border-[#FFD700] focus:ring-1 focus:ring-[#FFD700]'
+                              : 'bg-neutral-950/60 border border-neutral-800 text-neutral-500 cursor-not-allowed text-xs tracking-normal'
+                          }`}
+                          aria-label="이메일 6자리 인증코드 입력"
+                        />
+                      </div>
                       <button
                         type="button"
                         onClick={handleVerifyOtp}
-                        disabled={isVerifyingOtp || otpCode.length !== 6}
-                        className="min-h-[40px] px-4 py-2 rounded-xl bg-[#FFD700] hover:bg-yellow-400 text-black text-xs font-black transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0 flex items-center space-x-1"
+                        disabled={!isOtpSent || isVerifyingOtp || otpCode.length !== 6}
+                        className="h-11 px-4 rounded-xl bg-[#FFD700] hover:bg-yellow-400 text-black text-xs font-black transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0 whitespace-nowrap flex items-center justify-center space-x-1 active:scale-[0.98]"
                       >
                         {isVerifyingOtp ? (
                           <>
@@ -519,7 +536,9 @@ export default function AuthModal() {
                       </button>
                     </div>
                     <p className="text-[11px] text-neutral-400">
-                      입력하신 이메일의 수신함(또는 스팸함)을 확인해 주세요.
+                      {isOtpSent
+                        ? '입력하신 이메일의 수신함(또는 스팸함)을 확인해 주세요.'
+                        : '이메일을 입력한 후 상단 [인증번호 발송]을 누르면 코드가 발송됩니다.'}
                     </p>
                   </div>
                 )}

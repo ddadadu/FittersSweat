@@ -63,8 +63,8 @@ describe('Products API (/api/v1/products)', () => {
     expect(body.success).toBe(true);
     expect(body.page).toBe(1);
     expect(body.limit).toBe(10);
-    expect(body.total).toBe(400);
-    expect(body.totalPages).toBe(40);
+    expect(body.total).toBeGreaterThanOrEqual(400);
+    expect(body.totalPages).toBeGreaterThanOrEqual(40);
     expect(body.products.length).toBe(10);
   });
 

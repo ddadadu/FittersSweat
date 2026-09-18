@@ -4,6 +4,7 @@ import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import jwt from '@fastify/jwt';
 import rateLimit from '@fastify/rate-limit';
+import multipart from '@fastify/multipart';
 import dotenv from 'dotenv';
 import { authRoutes } from './routes/auth';
 import { eventRoutes } from './routes/events';
@@ -59,6 +60,13 @@ export async function buildApp(): Promise<FastifyInstance> {
   // JWT
   await app.register(jwt, {
     secret: process.env.JWT_SECRET || 'fallback-secret-for-development-32chars',
+  });
+
+  // Multipart File Upload (Max 10MB)
+  await app.register(multipart, {
+    limits: {
+      fileSize: 10 * 1024 * 1024,
+    },
   });
 
   // Rate Limiting (per-route configuration)

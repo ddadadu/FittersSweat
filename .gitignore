@@ -7,3 +7,4 @@ dist/
 postgres_data/
 coverage/
 *.log
+docs/erdcloud_schema.sql

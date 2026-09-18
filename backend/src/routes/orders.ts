@@ -17,8 +17,13 @@ export async function orderRoutes(app: FastifyInstance) {
       return reply.status(401).send({ message: 'Unauthorized' });
     }
 
-    const { items } = request.body as {
+    const { items, recipientName, recipientPhone, postcode, address, addressDetail } = request.body as {
       items: Array<{ productId: string | number; quantity: number }>;
+      recipientName?: string;
+      recipientPhone?: string;
+      postcode?: string;
+      address?: string;
+      addressDetail?: string;
     };
 
     if (!items || !Array.isArray(items) || items.length === 0) {
@@ -68,6 +73,11 @@ export async function orderRoutes(app: FastifyInstance) {
             userId,
             status: OrderStatus.pending,
             totalAmount,
+            recipientName: recipientName || null,
+            recipientPhone: recipientPhone || null,
+            postcode: postcode || null,
+            address: address || null,
+            addressDetail: addressDetail || null,
             orderItems: {
               create: orderItemCreates,
             },
@@ -226,7 +236,146 @@ export async function orderRoutes(app: FastifyInstance) {
     });
   });
 
-  // 3. 내 주문 내역 조회
+  // 3. 주문 단건 상세 조회
+  app.get('/:id', async (request, reply) => {
+    let userId: bigint;
+    try {
+      const token = request.headers.authorization?.replace('Bearer ', '');
+      if (!token) throw new Error('Missing token');
+      const decoded = app.jwt.verify<{ id: string }>(token);
+      userId = BigInt(decoded.id);
+    } catch {
+      return reply.status(401).send({ message: 'Unauthorized' });
+    }
+
+    const { id } = request.params as { id: string };
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    const isAdmin = user?.role === 'ADMIN';
+
+    let orderId: bigint;
+    try {
+      orderId = BigInt(id);
+    } catch {
+      return reply.status(400).send({ success: false, message: '유효하지 않은 주문 ID입니다.' });
+    }
+
+    const order = await prisma.order.findFirst({
+      where: isAdmin ? { id: orderId } : { id: orderId, userId },
+      include: {
+        orderItems: {
+          include: {
+            product: true,
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      return reply.status(404).send({ success: false, message: '주문을 찾을 수 없습니다.' });
+    }
+
+    return reply.send({
+      success: true,
+      order: {
+        ...order,
+        id: order.id.toString(),
+        userId: order.userId.toString(),
+        totalAmount: Number(order.totalAmount),
+        orderItems: order.orderItems.map((oi) => ({
+          ...oi,
+          id: oi.id.toString(),
+          orderId: oi.orderId.toString(),
+          productId: oi.productId.toString(),
+          unitPrice: Number(oi.unitPrice),
+          product: {
+            ...oi.product,
+            id: oi.product.id.toString(),
+            price: Number(oi.product.price),
+          },
+        })),
+      },
+    });
+  });
+
+  // 4. 배송지 수정 (pending / paid 상태까지만 허용)
+  app.patch('/:id/shipping', async (request, reply) => {
+    let userId: bigint;
+    try {
+      const token = request.headers.authorization?.replace('Bearer ', '');
+      if (!token) throw new Error('Missing token');
+      const decoded = app.jwt.verify<{ id: string }>(token);
+      userId = BigInt(decoded.id);
+    } catch {
+      return reply.status(401).send({ message: 'Unauthorized' });
+    }
+
+    const { id } = request.params as { id: string };
+    const { recipientName, recipientPhone, postcode, address, addressDetail } = request.body as {
+      recipientName?: string;
+      recipientPhone?: string;
+      postcode?: string;
+      address?: string;
+      addressDetail?: string;
+    };
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    const isAdmin = user?.role === 'ADMIN';
+
+    let orderId: bigint;
+    try {
+      orderId = BigInt(id);
+    } catch {
+      return reply.status(400).send({ success: false, message: '유효하지 않은 주문 ID입니다.' });
+    }
+
+    const order = await prisma.order.findFirst({
+      where: isAdmin ? { id: orderId } : { id: orderId, userId },
+    });
+
+    if (!order) {
+      return reply.status(404).send({ success: false, message: '주문을 찾을 수 없습니다.' });
+    }
+
+    if (!['pending', 'paid'].includes(order.status)) {
+      return reply.status(400).send({
+        success: false,
+        message: '배송이 시작된 후에는 배송지를 수정할 수 없습니다.',
+      });
+    }
+
+    const updated = await prisma.order.update({
+      where: { id: orderId },
+      data: {
+        recipientName: recipientName !== undefined ? recipientName : order.recipientName,
+        recipientPhone: recipientPhone !== undefined ? recipientPhone : order.recipientPhone,
+        postcode: postcode !== undefined ? postcode : order.postcode,
+        address: address !== undefined ? address : order.address,
+        addressDetail: addressDetail !== undefined ? addressDetail : order.addressDetail,
+      },
+    });
+
+    return reply.send({
+      success: true,
+      order: {
+        id: updated.id.toString(),
+        recipientName: updated.recipientName,
+        recipientPhone: updated.recipientPhone,
+        postcode: updated.postcode,
+        address: updated.address,
+        addressDetail: updated.addressDetail,
+        status: updated.status,
+      },
+    });
+  });
+
+  // 5. 내 주문 내역 조회
   app.get('/', async (request, reply) => {
     let userId: bigint;
     try {

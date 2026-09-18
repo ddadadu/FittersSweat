@@ -304,14 +304,13 @@ export function AiCoachDrawer() {
                 </button>
               </form>
 
-              <div className="flex items-center justify-between mt-2 px-1 text-[10px] text-neutral-500">
-                <span>⚡ Gemini 1.5 Flash 기반 레이스 AI</span>
-                {warningCount > 0 && (
+              {warningCount > 0 && (
+                <div className="flex items-center justify-end mt-2 px-1 text-[10px] text-neutral-500">
                   <span className="text-amber-400 font-medium">
                     경고 {warningCount}/5회
                   </span>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </motion.aside>
         </>

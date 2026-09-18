@@ -24,7 +24,7 @@ export async function productRoutes(app: FastifyInstance) {
     const limitNum = Math.max(1, Math.min(100, parseInt(limit, 10) || 20));
     const skip = (pageNum - 1) * limitNum;
 
-    const where: any = {};
+    const where: any = { isDeleted: false };
     if (categoryId && categoryId !== 'ALL') {
       where.categoryId = categoryId;
     }
@@ -98,7 +98,7 @@ export async function productRoutes(app: FastifyInstance) {
         },
       });
 
-      if (!product) {
+      if (!product || product.isDeleted) {
         return reply.status(404).send({ message: 'Product not found' });
       }
 

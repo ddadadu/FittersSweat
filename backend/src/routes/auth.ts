@@ -428,6 +428,10 @@ export async function authRoutes(app: FastifyInstance) {
           email: true,
           name: true,
           role: true,
+          phone: true,
+          postcode: true,
+          address: true,
+          addressDetail: true,
           createdAt: true,
         },
       });
@@ -448,6 +452,10 @@ export async function authRoutes(app: FastifyInstance) {
 
   const updateProfileSchema = z.object({
     name: z.string().min(1).optional(),
+    phone: z.string().max(20).optional().nullable(),
+    postcode: z.string().max(10).optional().nullable(),
+    address: z.string().max(255).optional().nullable(),
+    addressDetail: z.string().max(255).optional().nullable(),
     currentPassword: z.string().optional(),
     newPassword: z.string().min(6).optional(),
   });
@@ -463,7 +471,7 @@ export async function authRoutes(app: FastifyInstance) {
       schema: {
         tags: ['Auth'],
         summary: '내 정보 수정',
-        description: '사용자 이름 또는 비밀번호를 변경합니다.',
+        description: '사용자 이름, 연락처, 기본 배송지 또는 비밀번호를 변경합니다.',
       },
     },
     async (request, reply) => {
@@ -482,16 +490,35 @@ export async function authRoutes(app: FastifyInstance) {
         return reply.status(400).send({ message: 'Invalid input', errors: parseResult.error.errors });
       }
 
-      const { name, currentPassword, newPassword } = parseResult.data;
+      const { name, phone, postcode, address, addressDetail, currentPassword, newPassword } = parseResult.data;
       const user = await prisma.user.findUnique({ where: { id: userId } });
       if (!user) {
         return reply.status(404).send({ message: 'User not found' });
       }
 
-      const updateData: { name?: string; passwordHash?: string } = {};
+      const updateData: {
+        name?: string;
+        passwordHash?: string;
+        phone?: string | null;
+        postcode?: string | null;
+        address?: string | null;
+        addressDetail?: string | null;
+      } = {};
 
-      if (name) {
+      if (name !== undefined) {
         updateData.name = name;
+      }
+      if (phone !== undefined) {
+        updateData.phone = phone;
+      }
+      if (postcode !== undefined) {
+        updateData.postcode = postcode;
+      }
+      if (address !== undefined) {
+        updateData.address = address;
+      }
+      if (addressDetail !== undefined) {
+        updateData.addressDetail = addressDetail;
       }
 
       if (newPassword) {
@@ -508,7 +535,17 @@ export async function authRoutes(app: FastifyInstance) {
       const updated = await prisma.user.update({
         where: { id: userId },
         data: updateData,
-        select: { id: true, email: true, name: true, role: true, createdAt: true },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          phone: true,
+          postcode: true,
+          address: true,
+          addressDetail: true,
+          createdAt: true,
+        },
       });
 
       return reply.send({

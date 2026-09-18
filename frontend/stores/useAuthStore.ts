@@ -7,6 +7,10 @@ export interface AuthUser {
   name: string;
   role: string;
   createdAt?: string;
+  phone?: string | null;
+  postcode?: string | null;
+  address?: string | null;
+  addressDetail?: string | null;
 }
 
 interface AuthState {
@@ -19,7 +23,15 @@ interface AuthState {
   setAuthModalOpen: (open: boolean, tab?: 'login' | 'signup') => void;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, name: string, verificationToken?: string) => Promise<void>;
-  updateProfile: (data: { name?: string; currentPassword?: string; newPassword?: string }) => Promise<void>;
+  updateProfile: (data: {
+    name?: string;
+    phone?: string | null;
+    postcode?: string | null;
+    address?: string | null;
+    addressDetail?: string | null;
+    currentPassword?: string;
+    newPassword?: string;
+  }) => Promise<void>;
   logout: () => void;
   deleteAccount: (password: string) => Promise<void>;
   checkAuth: () => Promise<void>;

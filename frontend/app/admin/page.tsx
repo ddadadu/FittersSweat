@@ -23,6 +23,10 @@ import {
   Check,
   AlertCircle,
   ShoppingBag,
+  PlusCircle,
+  UploadCloud,
+  ImageIcon,
+  Trash2,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { ensureAuthToken } from '@/lib/api';
@@ -90,7 +94,7 @@ export default function AdminPage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
-  const [activeTab, setActiveTab] = useState<'orders' | 'inventory'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'inventory' | 'createProduct'>('orders');
 
   // Stats
   const [stats, setStats] = useState<AdminStats | null>(null);
@@ -106,6 +110,22 @@ export default function AdminPage() {
   const [stockEditMap, setStockEditMap] = useState<Record<string, number>>({});
   const [updatingProductId, setUpdatingProductId] = useState<string | null>(null);
   const [productSavedId, setProductSavedId] = useState<string | null>(null);
+  const [productToDelete, setProductToDelete] = useState<AdminProduct | null>(null);
+  const [isDeletingProduct, setIsDeletingProduct] = useState(false);
+
+  // Create Product State
+  const [productForm, setProductForm] = useState({
+    name: '',
+    description: '',
+    categoryId: 'shoes',
+    price: '',
+    stockQuantity: '',
+    imageUrl: '',
+    brandLogoUrl: '',
+    detailImageUrl: '',
+  });
+  const [isUploadingImage, setIsUploadingImage] = useState<string | null>(null);
+  const [isSubmittingProduct, setIsSubmittingProduct] = useState(false);
 
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -115,6 +135,112 @@ export default function AdminPage() {
   };
 
   const getApiUrl = () => process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+  // Image Upload Handler
+  const handleUploadImageFile = async (
+    field: 'imageUrl' | 'brandLogoUrl' | 'detailImageUrl',
+    file: File
+  ) => {
+    setIsUploadingImage(field);
+    try {
+      const token = await ensureAuthToken();
+      if (!token) {
+        showNotification('error', '로그인이 필요합니다.');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const res = await fetch(`${getApiUrl()}/api/v1/admin/upload-image`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (data.success && data.url) {
+        setProductForm((prev) => ({ ...prev, [field]: data.url }));
+        showNotification('success', '이미지가 성공적으로 업로드되었습니다.');
+      } else {
+        throw new Error(data.message || '업로드 실패');
+      }
+    } catch (err: any) {
+      showNotification('error', err.message || '이미지 업로드에 실패했습니다.');
+    } finally {
+      setIsUploadingImage(null);
+    }
+  };
+
+  // Product Create Submit Handler
+  const handleCreateProductSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!productForm.name.trim()) {
+      showNotification('error', '상품명을 입력해주세요.');
+      return;
+    }
+    const numPrice = Number(productForm.price);
+    if (isNaN(numPrice) || numPrice <= 0) {
+      showNotification('error', '유효한 가격을 입력해주세요.');
+      return;
+    }
+    const numStock = Number(productForm.stockQuantity);
+    if (isNaN(numStock) || numStock < 0 || !Number.isInteger(numStock)) {
+      showNotification('error', '재고 수량은 0 이상의 정수여야 합니다.');
+      return;
+    }
+
+    setIsSubmittingProduct(true);
+    try {
+      const token = await ensureAuthToken();
+      if (!token) {
+        showNotification('error', '로그인이 필요합니다.');
+        return;
+      }
+
+      const res = await fetch(`${getApiUrl()}/api/v1/admin/products`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: productForm.name.trim(),
+          description: productForm.description.trim() || undefined,
+          categoryId: productForm.categoryId,
+          price: numPrice,
+          stockQuantity: numStock,
+          imageUrl: productForm.imageUrl.trim() || undefined,
+          brandLogoUrl: productForm.brandLogoUrl.trim() || undefined,
+          detailImageUrl: productForm.detailImageUrl.trim() || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success && data.product) {
+        showNotification('success', `상품 "${data.product.name}"이(가) 등록되었습니다!`);
+        setProductForm({
+          name: '',
+          description: '',
+          categoryId: 'shoes',
+          price: '',
+          stockQuantity: '',
+          imageUrl: '',
+          brandLogoUrl: '',
+          detailImageUrl: '',
+        });
+        loadDashboardData(token);
+      } else {
+        throw new Error(data.message || '상품 등록에 실패했습니다.');
+      }
+    } catch (err: any) {
+      showNotification('error', err.message || '상품 등록 중 오류가 발생했습니다.');
+    } finally {
+      setIsSubmittingProduct(false);
+    }
+  };
 
   // 1. Auth & Admin Verification
   const verifyAdminAccess = useCallback(async () => {
@@ -274,6 +400,38 @@ export default function AdminPage() {
       showNotification('error', err.message || '재고 수량 변경 실패');
     } finally {
       setUpdatingProductId(null);
+    }
+  };
+
+  // 6. Delete Product (Soft Delete)
+  const handleDeleteProduct = async () => {
+    if (!productToDelete) return;
+    setIsDeletingProduct(true);
+    try {
+      const token = await ensureAuthToken();
+      if (!token) {
+        showNotification('error', '로그인이 필요합니다.');
+        return;
+      }
+      const res = await fetch(`${getApiUrl()}/api/v1/admin/products/${productToDelete.id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showNotification('success', data.message || '상품이 삭제되었습니다.');
+        setProducts((prev) => prev.filter((p) => p.id !== productToDelete.id));
+        setProductToDelete(null);
+        loadDashboardData(token);
+      } else {
+        showNotification('error', data.message || '상품 삭제에 실패했습니다.');
+      }
+    } catch {
+      showNotification('error', '상품 삭제 중 네트워크 오류가 발생했습니다.');
+    } finally {
+      setIsDeletingProduct(false);
     }
   };
 
@@ -451,6 +609,18 @@ export default function AdminPage() {
             <ShoppingBag className="w-4 h-4" />
             <span>직매입 장비 재고 관리 (400개 카탈로그)</span>
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('createProduct')}
+            className={`pb-3.5 px-2 text-sm font-bold transition-all border-b-2 min-h-[44px] flex items-center space-x-2 ${
+              activeTab === 'createProduct'
+                ? 'border-[#FFD700] text-[#FFD700]'
+                : 'border-transparent text-neutral-400 hover:text-white'
+            }`}
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span>신규 상품 등록 (Cloudinary)</span>
+          </button>
         </div>
 
         {/* TAB 1: Orders Management */}
@@ -520,7 +690,14 @@ export default function AdminPage() {
                         return (
                           <tr key={order.id} className="hover:bg-[#1A1A1A]/60 transition-colors">
                             <td className="py-4 px-4 font-mono font-bold text-white">
-                              #{order.id}
+                              <Link
+                                href={`/orders/${order.id}`}
+                                className="text-[#FFD700] hover:underline inline-flex items-center gap-1 group"
+                                title="주문 결제 및 배송 상세 보기"
+                              >
+                                <span>#{order.id}</span>
+                                <ExternalLink className="w-3 h-3 text-neutral-400 group-hover:text-[#FFD700] transition-colors" />
+                              </Link>
                               <div className="text-[10px] text-neutral-500 font-normal">
                                 {new Date(order.createdAt).toLocaleString('ko-KR', {
                                   month: 'numeric',
@@ -720,6 +897,15 @@ export default function AdminPage() {
                                   </>
                                 )}
                               </button>
+                              <button
+                                type="button"
+                                onClick={() => setProductToDelete(prod)}
+                                className="min-h-[36px] px-2.5 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-bold transition-colors flex items-center justify-center"
+                                title="상품 삭제"
+                                aria-label={`${prod.name} 삭제`}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -727,6 +913,294 @@ export default function AdminPage() {
                     })}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: Create New Product */}
+        {activeTab === 'createProduct' && (
+          <div className="max-w-3xl mx-auto space-y-6">
+            <div className="p-6 sm:p-8 rounded-2xl bg-[#141414] border border-[#262626] space-y-6">
+              <div>
+                <div className="flex items-center space-x-2 text-[#FFD700] text-xs font-black uppercase tracking-wider mb-1">
+                  <PlusCircle className="w-4 h-4" />
+                  <span>Catalog Registration</span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-black italic text-white">
+                  신규 장비 / 상품 등록
+                </h2>
+                <p className="text-xs text-neutral-400 mt-1">
+                  직매입 카탈로그에 새로운 상품을 등록합니다. 이미지는 파일 선택 즉시 Cloudinary 스토리지에 자동 업로드되어 URL이 기입됩니다.
+                </p>
+              </div>
+
+              <form onSubmit={handleCreateProductSubmit} className="space-y-6">
+                {/* 1. 기본 정보 */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-bold text-neutral-300 pb-2 border-b border-[#262626]">
+                    1. 기본 정보
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="sm:col-span-2 space-y-1.5">
+                      <label className="text-xs font-semibold text-neutral-300 block">
+                        상품명 <span className="text-rose-400">*</span>
+                      </label>
+                      <input
+                        required
+                        type="text"
+                        value={productForm.name}
+                        onChange={(e) => setProductForm((p) => ({ ...p, name: e.target.value }))}
+                        placeholder="예: [나이키] 줌 레이싱 플라이 5"
+                        className="w-full bg-[#1A1A1A] border border-[#333] rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-[#FFD700]"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-neutral-300 block">
+                        카테고리 <span className="text-rose-400">*</span>
+                      </label>
+                      <select
+                        value={productForm.categoryId}
+                        onChange={(e) => setProductForm((p) => ({ ...p, categoryId: e.target.value }))}
+                        className="w-full bg-[#1A1A1A] border border-[#333] rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-[#FFD700]"
+                      >
+                        <option value="shoes">레이싱화 (shoes)</option>
+                        <option value="nutrition">보충제 (nutrition)</option>
+                        <option value="gear">착용 장비 (gear)</option>
+                        <option value="equipment">훈련 기구 (equipment)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. 가격 및 재고 */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-bold text-neutral-300 pb-2 border-b border-[#262626]">
+                    2. 가격 및 재고
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-neutral-300 block">
+                        판매 가격 (원) <span className="text-rose-400">*</span>
+                      </label>
+                      <input
+                        required
+                        type="number"
+                        min="1"
+                        step="100"
+                        value={productForm.price}
+                        onChange={(e) => setProductForm((p) => ({ ...p, price: e.target.value }))}
+                        placeholder="예: 189000"
+                        className="w-full bg-[#1A1A1A] border border-[#333] rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-[#FFD700]"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-neutral-300 block">
+                        초기 입고 수량 (개) <span className="text-rose-400">*</span>
+                      </label>
+                      <input
+                        required
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={productForm.stockQuantity}
+                        onChange={(e) => setProductForm((p) => ({ ...p, stockQuantity: e.target.value }))}
+                        placeholder="예: 50"
+                        className="w-full bg-[#1A1A1A] border border-[#333] rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:border-[#FFD700]"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. 상세 설명 */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-neutral-300 block">
+                    상품 상세 설명
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={productForm.description}
+                    onChange={(e) => setProductForm((p) => ({ ...p, description: e.target.value }))}
+                    placeholder="HYROX 레이스 적합도, 스펙, 특징 등을 자유롭게 기술하세요."
+                    className="w-full bg-[#1A1A1A] border border-[#333] rounded-xl p-3.5 text-white text-sm outline-none focus:border-[#FFD700] resize-none"
+                  />
+                </div>
+
+                {/* 4. 이미지 등록 및 Cloudinary 자동 업로드 */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-bold text-neutral-300 pb-2 border-b border-[#262626]">
+                    3. 상품 이미지 (Cloudinary 자동 업로드)
+                  </h3>
+                  <div className="space-y-4">
+                    {([
+                      { field: 'imageUrl' as const, label: '대표 썸네일 이미지', desc: '장비 목록 및 카드에 표시되는 메인 이미지' },
+                      { field: 'brandLogoUrl' as const, label: '브랜드 로고 이미지', desc: '제조사/브랜드 로고 이미지' },
+                      { field: 'detailImageUrl' as const, label: '상세 페이지 이미지', desc: '상품 상세 본문에 노출되는 고해상도 이미지' },
+                    ]).map(({ field, label, desc }) => (
+                      <div key={field} className="p-4 rounded-xl bg-[#1A1A1A] border border-[#262626] space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                          <div>
+                            <span className="text-xs font-bold text-white">{label}</span>
+                            <p className="text-[11px] text-neutral-400">{desc}</p>
+                          </div>
+                          {isUploadingImage === field && (
+                            <span className="text-xs text-[#FFD700] flex items-center gap-1 font-semibold">
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>Cloudinary 업로드 중...</span>
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row items-start gap-3">
+                          {productForm[field] ? (
+                            <div className="w-20 h-20 rounded-xl bg-[#141414] border border-[#333] overflow-hidden shrink-0 flex items-center justify-center relative group">
+                              <Image
+                                src={productForm[field]}
+                                alt={label}
+                                width={80}
+                                height={80}
+                                className="w-full h-full object-cover"
+                                unoptimized
+                              />
+                            </div>
+                          ) : (
+                            <div className="w-20 h-20 rounded-xl bg-[#141414] border border-dashed border-neutral-700 flex flex-col items-center justify-center shrink-0 text-neutral-500">
+                              <ImageIcon className="w-6 h-6" />
+                              <span className="text-[10px] mt-1">미등록</span>
+                            </div>
+                          )}
+
+                          <div className="flex-1 w-full space-y-2">
+                            <div className="flex gap-2">
+                              <label className="cursor-pointer px-3.5 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-[#FFD700] border border-neutral-700 text-xs font-bold transition-colors inline-flex items-center gap-1.5 shrink-0">
+                                <UploadCloud className="w-3.5 h-3.5" />
+                                <span>파일 선택</span>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  disabled={isUploadingImage !== null}
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleUploadImageFile(field, file);
+                                  }}
+                                />
+                              </label>
+                              <input
+                                type="url"
+                                value={productForm[field]}
+                                onChange={(e) => setProductForm((p) => ({ ...p, [field]: e.target.value }))}
+                                placeholder="또는 직접 URL 입력 (예: https://...)"
+                                className="w-full bg-[#141414] border border-[#333] rounded-xl px-3 py-2 text-white text-xs outline-none focus:border-[#FFD700]"
+                              />
+                            </div>
+                            {productForm[field] && (
+                              <p className="text-[11px] text-emerald-400 truncate">
+                                ✓ 업로드 완료: {productForm[field]}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 제출 버튼 */}
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProductForm({
+                        name: '',
+                        description: '',
+                        categoryId: 'shoes',
+                        price: '',
+                        stockQuantity: '',
+                        imageUrl: '',
+                        brandLogoUrl: '',
+                        detailImageUrl: '',
+                      });
+                      setActiveTab('inventory');
+                    }}
+                    className="flex-1 py-3 rounded-xl bg-neutral-900 border border-neutral-800 hover:bg-neutral-800 text-white text-sm font-bold transition-colors"
+                  >
+                    취소 및 목록으로
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingProduct || isUploadingImage !== null}
+                    className="flex-1 py-3 px-8 rounded-xl bg-[#FFD700] hover:bg-[#E6C200] text-black text-sm font-black transition-colors flex items-center justify-center space-x-2 disabled:opacity-50"
+                  >
+                    {isSubmittingProduct ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>상품 등록 처리 중...</span>
+                      </>
+                    ) : (
+                      <>
+                        <PlusCircle className="w-4 h-4" />
+                        <span>신규 상품 등록 완료</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal (Option 2) */}
+        {productToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+            <div className="w-full max-w-md p-6 rounded-2xl bg-[#141414] border border-[#262626] shadow-2xl space-y-5">
+              <div className="flex items-start space-x-3.5">
+                <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0 text-red-400">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">상품 삭제 확인</h3>
+                  <p className="text-xs text-neutral-400 mt-1">
+                    정말로 <span className="text-white font-semibold">&ldquo;{productToDelete.name}&rdquo;</span> 상품을 삭제하시겠습니까?
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-[#1A1A1A] border border-[#262626] text-xs text-neutral-400 space-y-1">
+                <div className="flex items-center text-neutral-300 font-medium space-x-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 text-[#FFD700]" />
+                  <span>소프트 딜리트(Soft Delete) 안내</span>
+                </div>
+                <p>기존 고객의 주문 내역 및 결제 데이터는 보존되며, 상점 및 관리자 목록에서 즉시 숨김 처리됩니다.</p>
+              </div>
+
+              <div className="flex space-x-3 pt-2">
+                <button
+                  type="button"
+                  disabled={isDeletingProduct}
+                  onClick={() => setProductToDelete(null)}
+                  className="flex-1 py-2.5 rounded-xl bg-neutral-900 border border-neutral-800 hover:bg-neutral-800 text-white text-xs font-bold transition-colors disabled:opacity-50"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  disabled={isDeletingProduct}
+                  onClick={handleDeleteProduct}
+                  className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition-colors flex items-center justify-center space-x-1.5 disabled:opacity-50"
+                >
+                  {isDeletingProduct ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>삭제 중...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>삭제 확인</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>
