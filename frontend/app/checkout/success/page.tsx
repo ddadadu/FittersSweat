@@ -29,6 +29,14 @@ function SuccessContent() {
 
   // Review Finding #3: Idempotent guard to prevent duplicate payment confirmation calls in React 18 Strict Mode
   const hasConfirmedRef = useRef(false);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!orderId || !paymentKey || !amount) {
@@ -39,8 +47,6 @@ function SuccessContent() {
 
     if (hasConfirmedRef.current) return;
     hasConfirmedRef.current = true;
-
-    let isMounted = true;
 
     async function confirmPayment() {
       // 1. Ensure auth token is available
@@ -57,7 +63,7 @@ function SuccessContent() {
           }),
         });
 
-        if (isMounted) {
+        if (isMountedRef.current) {
           useCartStore.getState().clearCart();
           setApprovedDate(new Date().toLocaleString('ko-KR'));
           setStatus('success');
@@ -66,13 +72,13 @@ function SuccessContent() {
         const msg = err.message || '';
         // Defensive handling: If already paid, order is successfully completed!
         if (msg.includes('paid') || msg.includes('이미') || msg.includes('결제할 수 없는 주문 상태')) {
-          if (isMounted) {
+          if (isMountedRef.current) {
             useCartStore.getState().clearCart();
             setApprovedDate(new Date().toLocaleString('ko-KR'));
             setStatus('already_paid');
           }
         } else {
-          if (isMounted) {
+          if (isMountedRef.current) {
             setStatus('error');
             setErrorMessage(msg || '결제 승인 처리 중 오류가 발생했습니다.');
           }
@@ -81,10 +87,6 @@ function SuccessContent() {
     }
 
     confirmPayment();
-
-    return () => {
-      isMounted = false;
-    };
   }, [orderId, paymentKey, amount]);
 
   if (status === 'loading') {
