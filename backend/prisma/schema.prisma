@@ -53,6 +53,11 @@ model Event {
   id               BigInt            @id @default(autoincrement())
   name             String            @db.VarChar(255)
   cityCode         String            @map("city_code") @db.VarChar(10)
+  continent        String?           @db.VarChar(50)
+  country          String?           @db.VarChar(100)
+  city             String?           @db.VarChar(100)
+  division         String?           @default("Adults") @db.VarChar(50)
+  imageUrl         String?           @map("image_url") @db.VarChar(500)
   startDate        DateTime          @map("start_date") @db.Date
   endDate          DateTime          @map("end_date") @db.Date
   eventUrl         String?           @map("event_url") @db.VarChar(500)
