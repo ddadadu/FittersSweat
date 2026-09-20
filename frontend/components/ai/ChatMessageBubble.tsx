@@ -3,10 +3,44 @@
 import React from 'react';
 import Link from 'next/link';
 import { Bot, User, Sparkles, HelpCircle } from 'lucide-react';
-import { ChatMessage } from '@/stores/useAiChatStore';
+import { ChatMessage, useAiChatStore } from '@/stores/useAiChatStore';
 import { MiniProductCard } from './MiniProductCard';
 import { ReviewAccordion } from './ReviewAccordion';
 import { RecursiveQueryPills } from './RecursiveQueryPills';
+
+function renderLink(label: string, href: string, key: string, isBold = false) {
+  const cleanLabel = label.replace(/\*\*/g, '').trim();
+  const isInternal = href.startsWith('/') || href.startsWith('#');
+  const className = `inline-flex items-center gap-1 text-[#FFD700] hover:text-[#FFE44D] ${
+    isBold ? 'font-bold' : 'font-semibold'
+  } underline underline-offset-4 cursor-pointer transition-colors duration-200`;
+
+  const handleClick = () => {
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      useAiChatStore.getState().setOpen(false);
+    }
+  };
+
+  if (isInternal) {
+    return (
+      <Link key={key} href={href} onClick={handleClick} className={className}>
+        {cleanLabel} ➔
+      </Link>
+    );
+  }
+
+  return (
+    <a
+      key={key}
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={className}
+    >
+      {cleanLabel} ➔
+    </a>
+  );
+}
 
 /**
  * Lightweight inline markdown renderer for chat bubbles.
@@ -16,54 +50,53 @@ import { RecursiveQueryPills } from './RecursiveQueryPills';
 function renderFormattedContent(content: string) {
   if (!content) return null;
 
-  // Split by markdown link [label](url) or bold **text**
-  const tokens = content.split(/(\[[^\]]+\]\([^)]+\)|\*\*[^*]+\*\*)/g);
+  // Split by bold link **[...](...)**, normal link [...](...), or bold **...**
+  // Note: \s* allows for optional space between ] and ( e.g. [name] (/events/1)
+  const tokens = content.split(
+    /(\*\*\[[^\]]+\]\s*\([^)]+\)\*\*|\[[^\]]+\]\s*\([^)]+\)|\*\*[^*]+\*\*)/g
+  );
 
   return tokens.map((part, index) => {
     if (!part) return null;
 
-    // Check for markdown link [label](url)
-    const linkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
-    if (linkMatch) {
-      const [, label, href] = linkMatch;
-      const isInternal = href.startsWith('/') || href.startsWith('#');
-
-      if (isInternal) {
-        return (
-          <Link
-            key={`link-${index}`}
-            href={href}
-            className="inline-flex items-center gap-1 text-[#FFD700] hover:text-[#FFE44D] font-semibold underline underline-offset-4 cursor-pointer transition-colors duration-200"
-          >
-            {label} ➔
-          </Link>
-        );
-      }
-
-      return (
-        <a
-          key={`ext-link-${index}`}
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-[#FFD700] hover:text-[#FFE44D] font-semibold underline underline-offset-4 cursor-pointer transition-colors duration-200"
-        >
-          {label} ➔
-        </a>
-      );
+    // 1. Bold link: **[label](href)** or **[label] (href)**
+    const boldLinkMatch = part.match(/^\*\*\[([^\]]+)\]\s*\(([^)]+)\)\*\*$/);
+    if (boldLinkMatch) {
+      return renderLink(boldLinkMatch[1], boldLinkMatch[2], `blink-${index}`, true);
     }
 
-    // Check for bold **text**
+    // 2. Normal link: [label](href) or [label] (href)
+    const linkMatch = part.match(/^\[([^\]]+)\]\s*\(([^)]+)\)$/);
+    if (linkMatch) {
+      return renderLink(linkMatch[1], linkMatch[2], `link-${index}`, false);
+    }
+
+    // 3. Bold text: **text** (may also contain markdown links inside)
     const boldMatch = part.match(/^\*\*([^*]+)\*\*$/);
     if (boldMatch) {
+      const inner = boldMatch[1];
+      if (inner.includes('[') && (inner.includes('](') || inner.includes('] ('))) {
+        const subTokens = inner.split(/(\[[^\]]+\]\s*\([^)]+\))/g);
+        return (
+          <strong key={`bold-${index}`} className="font-bold text-white">
+            {subTokens.map((sub, sIdx) => {
+              const subMatch = sub.match(/^\[([^\]]+)\]\s*\(([^)]+)\)$/);
+              if (subMatch) {
+                return renderLink(subMatch[1], subMatch[2], `sublink-${index}-${sIdx}`, true);
+              }
+              return sub;
+            })}
+          </strong>
+        );
+      }
       return (
         <strong key={`bold-${index}`} className="font-bold text-white">
-          {boldMatch[1]}
+          {inner}
         </strong>
       );
     }
 
-    // Regular plain text
+    // 4. Plain text
     return <React.Fragment key={`text-${index}`}>{part}</React.Fragment>;
   });
 }
