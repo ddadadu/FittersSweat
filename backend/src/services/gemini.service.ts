@@ -237,6 +237,52 @@ JSON 출력 규격:
    * Generates a 768-dimensional text embedding using gemini-embedding-001.
    * Falls back to deterministic mock vector if API key is not configured.
    */
+  /**
+   * Generates 768-dimensional text embeddings in batch using gemini-embedding-001.
+   * Efficiently packs multiple texts into a single API request (up to 100 items)
+   * to respect Google API rate limits (100 RPM free tier).
+   */
+  async embedTexts(texts: string[], retries = 5): Promise<number[][]> {
+    if (this.isMock || !this.genAI) {
+      return texts.map((t) => this.generateMockEmbedding(t));
+    }
+
+    const model = this.genAI.getGenerativeModel({
+      model: 'gemini-embedding-001',
+    });
+
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const result = await model.batchEmbedContents({
+          requests: texts.map((text) => ({
+            content: { parts: [{ text }] },
+            outputDimensionality: 768,
+          })),
+        });
+        if (result.embeddings && result.embeddings.length === texts.length) {
+          return result.embeddings.map((e, idx) =>
+            e.values && e.values.length === 768 ? e.values : this.generateMockEmbedding(texts[idx])
+          );
+        }
+      } catch (err: any) {
+        const isRateLimit =
+          err?.status === 429 ||
+          err?.message?.includes('429') ||
+          err?.message?.includes('Quota exceeded');
+        if (isRateLimit && attempt < retries) {
+          const match = err?.message?.match(/retry in ([0-9.]+)/i);
+          const waitSec = match ? Math.ceil(parseFloat(match[1])) + 2 : 25;
+          console.warn(`[GeminiService] Rate limited (429). Retrying after ${waitSec}s... (attempt ${attempt + 1}/${retries})`);
+          await new Promise((r) => setTimeout(r, waitSec * 1000));
+          continue;
+        }
+        console.warn('[GeminiService] batchEmbedContents failed, falling back to mock:', err?.message || err);
+        return texts.map((t) => this.generateMockEmbedding(t));
+      }
+    }
+    return texts.map((t) => this.generateMockEmbedding(t));
+  }
+
   async embedText(text: string): Promise<number[]> {
     if (this.isMock || !this.genAI) {
       return this.generateMockEmbedding(text);
