@@ -1,6 +1,6 @@
 import { buildApp } from '../src/app';
 import { FastifyInstance } from 'fastify';
-import { parseKoreanDate } from '../src/tasks/scraper';
+import { parseKoreanDate, scrapeHyroxEvents } from '../src/tasks/scraper';
 
 describe('Events API & Scraper (/api/v1/events)', () => {
   let app: FastifyInstance;
@@ -23,6 +23,21 @@ describe('Events API & Scraper (/api/v1/events)', () => {
 
   afterAll(async () => {
     await app.close();
+  });
+
+  describe('Global HYROX Scraper Integration Test', () => {
+    it('should scrape global events and parse continent, country, city, and division', async () => {
+      const events = await scrapeHyroxEvents();
+      expect(events.length).toBeGreaterThanOrEqual(100);
+
+      const first = events[0];
+      expect(first.name).toBeDefined();
+      expect(first.cityCode).toBeDefined();
+      expect((first as any).city).toBeDefined();
+      expect((first as any).country).toBeDefined();
+      expect((first as any).continent).toBeDefined();
+      expect((first as any).division).toMatch(/^(Adults|Youngstars)$/);
+    }, 60000);
   });
 
   describe('Date Parser Unit Test', () => {
