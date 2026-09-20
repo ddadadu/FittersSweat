@@ -107,7 +107,7 @@ export async function scrapeHyroxEvents(): Promise<ScrapedEvent[]> {
               imageUrl: item.imageUrl,
               endDate: item.endDate,
               eventUrl: item.eventUrl,
-              status: EventStatus.upcoming,
+              status: item.endDate < new Date() ? EventStatus.past : EventStatus.upcoming,
             },
             create: {
               name: item.name,
@@ -120,7 +120,7 @@ export async function scrapeHyroxEvents(): Promise<ScrapedEvent[]> {
               startDate: item.startDate,
               endDate: item.endDate,
               eventUrl: item.eventUrl,
-              status: EventStatus.upcoming,
+              status: item.endDate < new Date() ? EventStatus.past : EventStatus.upcoming,
             },
           })
         )

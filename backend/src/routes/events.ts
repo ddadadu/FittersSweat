@@ -11,6 +11,7 @@ export async function eventRoutes(app: FastifyInstance) {
       country?: string;
       city?: string;
       division?: string;
+      status?: string;
     };
 
     const where: Prisma.EventWhereInput = {};
@@ -26,6 +27,14 @@ export async function eventRoutes(app: FastifyInstance) {
     }
     if (query.division && query.division !== 'ALL') {
       where.division = query.division;
+    }
+    if (query.status && query.status !== 'ALL') {
+      const now = new Date();
+      if (query.status === 'UPCOMING' || query.status === 'upcoming') {
+        where.endDate = { gte: now };
+      } else if (query.status === 'PAST' || query.status === 'past' || query.status === 'completed') {
+        where.endDate = { lt: now };
+      }
     }
 
     const events = await prisma.event.findMany({

@@ -94,6 +94,31 @@ describe('Events API & Scraper (/api/v1/events)', () => {
       bodyDivision.events.forEach((e: any) => {
         expect(e.division).toBe('Youngstars');
       });
+
+      const resPast = await app.inject({
+        method: 'GET',
+        url: '/api/v1/events?status=PAST',
+      });
+      expect(resPast.statusCode).toBe(200);
+      const bodyPast = JSON.parse(resPast.payload);
+      expect(bodyPast.success).toBe(true);
+      expect(bodyPast.events.length).toBeGreaterThan(0);
+      const now = new Date();
+      bodyPast.events.forEach((e: any) => {
+        expect(new Date(e.endDate).getTime()).toBeLessThan(now.getTime());
+      });
+
+      const resUpcoming = await app.inject({
+        method: 'GET',
+        url: '/api/v1/events?status=UPCOMING',
+      });
+      expect(resUpcoming.statusCode).toBe(200);
+      const bodyUpcoming = JSON.parse(resUpcoming.payload);
+      expect(bodyUpcoming.success).toBe(true);
+      expect(bodyUpcoming.events.length).toBeGreaterThan(0);
+      bodyUpcoming.events.forEach((e: any) => {
+        expect(new Date(e.endDate).getTime()).toBeGreaterThanOrEqual(now.getTime());
+      });
     });
 
     it('GET /api/v1/events/:id - should return single event details', async () => {

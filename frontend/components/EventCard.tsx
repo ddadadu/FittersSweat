@@ -29,11 +29,16 @@ interface EventCardProps {
 
 export default function EventCard({ event, isInterested = false, onToggleInterest }: EventCardProps) {
   const start = new Date(event.startDate);
+  const end = new Date(event.endDate);
+  end.setHours(23, 59, 59, 999);
   const now = new Date();
+
+  const isPast = now > end;
+  const isOngoing = now >= start && now <= end;
   const diffTime = start.getTime() - now.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-  const dDayText = diffDays > 0 ? `D-${diffDays}` : diffDays === 0 ? 'D-DAY' : '종료';
+  const dDayText = isPast ? '종료' : isOngoing ? '진행중' : diffDays > 0 ? `D-${diffDays}` : 'D-DAY';
   const cityLabel = event.city
     ? event.country
       ? `${event.city}, ${event.country}`
