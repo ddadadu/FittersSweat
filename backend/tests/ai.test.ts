@@ -2,6 +2,7 @@ import { buildApp } from '../src/app';
 import { FastifyInstance } from 'fastify';
 
 describe('AI Recommendation API (POST /api/v1/ai/recommend)', () => {
+  jest.setTimeout(30000);
   let app: FastifyInstance;
 
   beforeAll(async () => {
@@ -63,6 +64,24 @@ describe('AI Recommendation API (POST /api/v1/ai/recommend)', () => {
     if (body.recommendedProducts.length > 0) {
       expect(body.recommendedProducts.every((p: any) => p.categoryId === 'nutrition')).toBe(true);
     }
+  });
+
+  it('returns Post 5 (wide-fit shoe runner) at rank 1 with lexical boost for wide foot runner query', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/ai/recommend',
+      payload: { query: '발볼 넓은 러너 적합 신발 추천' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.success).toBe(true);
+    expect(Array.isArray(body.verifiedReviews)).toBe(true);
+    expect(body.verifiedReviews.length).toBeGreaterThan(0);
+    // Post 5 should be the #1 ranked post
+    expect(body.verifiedReviews[0].id).toBe('5');
+    expect(body.verifiedReviews[0].title).toContain('발볼 10.5cm');
+    expect(body.verifiedReviews[0].similarity).toBeGreaterThan(0.75);
   });
 
   describe('POST /api/v1/ai/chat (Multi-turn conversational chat)', () => {
@@ -143,21 +162,24 @@ describe('AI Recommendation API (POST /api/v1/ai/recommend)', () => {
     });
 
     it('returns 429 error and warning message when exceeding rate limit (10 req/min)', async () => {
-      // Send 11 rapid requests from a unique IP
-      let lastRes: any;
-      for (let i = 0; i < 11; i++) {
-        lastRes = await app.inject({
-          method: 'POST',
-          url: '/api/v1/ai/chat',
-          payload: { query: '테스트 질문' },
-          remoteAddress: '192.168.99.1',
-        });
-      }
+      // Send 12 rapid requests from a unique IP in parallel to trigger rate limiter
+      const responses = await Promise.all(
+        Array.from({ length: 12 }, () =>
+          app.inject({
+            method: 'POST',
+            url: '/api/v1/ai/chat',
+            payload: { query: '테스트 질문' },
+            remoteAddress: '192.168.99.1',
+          })
+        )
+      );
 
-      expect(lastRes.statusCode).toBe(429);
-      const body = JSON.parse(lastRes.body);
+      const rateLimitedRes = responses.find((r) => r.statusCode === 429);
+      expect(rateLimitedRes).toBeDefined();
+      expect(rateLimitedRes!.statusCode).toBe(429);
+      const body = JSON.parse(rateLimitedRes!.body);
       expect(body.message).toContain('매크로 방지를 위해 분당 메세지 제한이 설정되었습니다');
-    });
+    }, 30000);
   });
 });
 

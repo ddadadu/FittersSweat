@@ -45,7 +45,7 @@ export class GeminiService {
 
     try {
       const model = this.genAI.getGenerativeModel({
-        model: 'gemini-3.6-flash',
+        model: 'gemini-3.5-flash-lite',
         generationConfig: {
           responseMimeType: 'application/json',
           maxOutputTokens: 200,
@@ -151,7 +151,7 @@ ${historyContext}
 
     try {
       const chatModel = this.genAI.getGenerativeModel({
-        model: 'gemini-3.6-flash',
+        model: 'gemini-3.5-flash-lite',
         generationConfig: {
           responseMimeType: 'application/json',
           maxOutputTokens: 500,
@@ -248,16 +248,16 @@ JSON 출력 규격:
     }
 
     const model = this.genAI.getGenerativeModel({
-      model: 'gemini-embedding-001',
+      model: 'gemini-embedding-2',
     });
 
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
         const result = await model.batchEmbedContents({
           requests: texts.map((text) => ({
-            content: { parts: [{ text }] },
+            content: { parts: [{ text }], role: 'user' },
             outputDimensionality: 768,
-          })),
+          } as any)),
         });
         if (result.embeddings && result.embeddings.length === texts.length) {
           return result.embeddings.map((e, idx) =>
@@ -287,24 +287,8 @@ JSON 출력 규격:
     if (this.isMock || !this.genAI) {
       return this.generateMockEmbedding(text);
     }
-
-    try {
-      const model = this.genAI.getGenerativeModel({
-        model: 'gemini-embedding-001',
-      });
-      // @google/generative-ai embedContent supports { content: { parts: [{ text }] }, outputDimensionality: 768 }
-      const result = await model.embedContent({
-        content: { parts: [{ text }] },
-        outputDimensionality: 768,
-      } as any);
-      if (result.embedding?.values && result.embedding.values.length === 768) {
-        return result.embedding.values;
-      }
-      return this.generateMockEmbedding(text);
-    } catch (err: any) {
-      console.warn('[GeminiService] embedText failed, falling back to mock:', err?.message || err);
-      return this.generateMockEmbedding(text);
-    }
+    const [vec] = await this.embedTexts([text]);
+    return vec || this.generateMockEmbedding(text);
   }
 
   /**
@@ -329,7 +313,7 @@ JSON 출력 규격:
     }
 
     try {
-      const chatModel = this.genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
+      const chatModel = this.genAI.getGenerativeModel({ model: 'gemini-3.5-flash-lite' });
       const prompt = `당신은 세계적인 피트니스 레이스 HYROX 전문 수석 기어 피터(Chief Gear Fitter)입니다.
 사용자의 질문과 실제 레이서들의 검증된 완주 후기, 직매입 장비 스펙을 바탕으로 2~3문장의 명확하고 자신감 넘치는 맞춤 처방을 한국어로 작성해주세요.
 

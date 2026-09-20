@@ -24,6 +24,34 @@ interface RawPostMatch {
   similarity: number;
 }
 
+/**
+ * Applies a +10% lexical boost (similarity * 1.10) to candidate posts whose title or content
+ * directly contains keywords (length >= 2) from the user's query.
+ */
+function applyLexicalBoostToPosts(rawPosts: RawPostMatch[], query: string): RawPostMatch[] {
+  const keywords = query
+    .toLowerCase()
+    .replace(/[^\w\sㄱ-ㅎㅏ-ㅣ가-힣]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length >= 2);
+
+  if (keywords.length === 0) {
+    return rawPosts;
+  }
+
+  const boosted = rawPosts.map((post) => {
+    const textToSearch = `${post.title} ${post.content}`.toLowerCase();
+    const hasDirectMatch = keywords.some((kw) => textToSearch.includes(kw));
+    return {
+      ...post,
+      similarity: hasDirectMatch ? post.similarity * 1.1 : post.similarity,
+    };
+  });
+
+  boosted.sort((a, b) => b.similarity - a.similarity);
+  return boosted;
+}
+
 export async function aiRoutes(app: FastifyInstance) {
   /**
    * POST /api/v1/ai/recommend
@@ -55,7 +83,7 @@ export async function aiRoutes(app: FastifyInstance) {
         categoryId || null
       );
 
-      // 2. Dual-Retriever: 2) Community Posts Cosine Search
+      // 2. Dual-Retriever: 2) Community Posts Cosine Search (Top 8 candidates)
       const rawPosts = await prisma.$queryRawUnsafe<RawPostMatch[]>(
         `SELECT p.id, p.title, p.content, p.user_id, u.name as user_name,
                 (1 - (p.embedding <=> $1::vector))::float as similarity
@@ -63,12 +91,15 @@ export async function aiRoutes(app: FastifyInstance) {
          JOIN users u ON p.user_id = u.id
          WHERE p.embedding IS NOT NULL
          ORDER BY p.embedding <=> $1::vector ASC
-         LIMIT 4;`,
+         LIMIT 8;`,
         vectorStr
       );
 
+      // Apply +10% lexical boost for matching query keywords
+      const boostedPosts = applyLexicalBoostToPosts(rawPosts, query.trim());
+
       // 3. Cross-Referencing: Check PostProductTag foreign key links
-      const postIds = rawPosts.map((p) => p.id);
+      const postIds = boostedPosts.slice(0, 4).map((p) => p.id);
       const postTags = postIds.length > 0
         ? await prisma.postProductTag.findMany({
             where: { postId: { in: postIds } },
@@ -101,7 +132,7 @@ export async function aiRoutes(app: FastifyInstance) {
       const topProducts = rerankedProducts.slice(0, 3);
 
       // Format top posts
-      const topPosts = rawPosts.slice(0, 2).map((post) => ({
+      const topPosts = boostedPosts.slice(0, 2).map((post) => ({
         id: post.id.toString(),
         title: post.title,
         content: post.content,
@@ -225,7 +256,7 @@ export async function aiRoutes(app: FastifyInstance) {
           }
         }
 
-        // 3. Community Posts Cosine Search
+        // 3. Community Posts Cosine Search (Top 8 candidates)
         const rawPosts = await prisma.$queryRawUnsafe<RawPostMatch[]>(
           `SELECT p.id, p.title, p.content, p.user_id, u.name as user_name,
                   (1 - (p.embedding <=> $1::vector))::float as similarity
@@ -233,12 +264,15 @@ export async function aiRoutes(app: FastifyInstance) {
            JOIN users u ON p.user_id = u.id
            WHERE p.embedding IS NOT NULL
            ORDER BY p.embedding <=> $1::vector ASC
-           LIMIT 4;`,
+           LIMIT 8;`,
           vectorStr
         );
 
+        // Apply +10% lexical boost for matching query keywords
+        const boostedPosts = applyLexicalBoostToPosts(rawPosts, q);
+
         // 4. Cross-referencing: PostProductTag foreign key +20% boost
-        const postIds = rawPosts.map((p) => p.id);
+        const postIds = boostedPosts.slice(0, 4).map((p) => p.id);
         const postTags = postIds.length > 0
           ? await prisma.postProductTag.findMany({
               where: { postId: { in: postIds } },
@@ -268,7 +302,7 @@ export async function aiRoutes(app: FastifyInstance) {
         rerankedProducts.sort((a, b) => b.rerankScore - a.rerankScore);
         const topProducts = rerankedProducts.slice(0, 3);
 
-        const topPosts = rawPosts.slice(0, 2).map((post) => ({
+        const topPosts = boostedPosts.slice(0, 2).map((post) => ({
           id: post.id.toString(),
           title: post.title,
           content: post.content,
