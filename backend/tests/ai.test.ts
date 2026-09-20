@@ -161,6 +161,43 @@ describe('AI Recommendation API (POST /api/v1/ai/recommend)', () => {
       }
     });
 
+    it('dispatches general chat to casual persona response with 0 products/reviews', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/v1/ai/chat',
+        payload: { query: '안녕 챗봇 피터 넌 어떤 역할을 수행해?' },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.success).toBe(true);
+      expect(body.intentType).toBe('general_chat');
+      expect(body.recommendedProducts).toHaveLength(0);
+      expect(body.verifiedReviews).toHaveLength(0);
+      expect(body.advice).toMatch(/피터|기어|FitterSweat/);
+      expect(Array.isArray(body.suggestedQueries)).toBe(true);
+      expect(body.suggestedQueries.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('dispatches event schedule query to events table query with markdown links and 0 products', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/v1/ai/chat',
+        payload: { query: '현재 종료되지 않은 대한민국 내 대회 일정을 알려줘' },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = JSON.parse(res.body);
+      expect(body.success).toBe(true);
+      expect(body.intentType).toBe('event_schedule');
+      expect(body.recommendedProducts).toHaveLength(0);
+      expect(body.verifiedReviews).toHaveLength(0);
+      expect(body.advice).toContain('/events');
+      expect(body.advice).toMatch(/서울|인천|HYROX/);
+      expect(Array.isArray(body.suggestedQueries)).toBe(true);
+      expect(body.suggestedQueries.length).toBeGreaterThanOrEqual(2);
+    });
+
     it('returns 429 error and warning message when exceeding rate limit (10 req/min)', async () => {
       // Send 12 rapid requests from a unique IP in parallel to trigger rate limiter
       const responses = await Promise.all(

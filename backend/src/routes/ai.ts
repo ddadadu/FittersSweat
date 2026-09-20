@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { PrismaClient } from '@prisma/client';
 import { geminiService } from '../services/gemini.service';
+import { eventAdvisorService } from '../services/event-advisor.service';
 
 const prisma = new PrismaClient();
 
@@ -211,14 +212,47 @@ export async function aiRoutes(app: FastifyInstance) {
         : [];
 
       try {
-        // 1. Parallel execution: Category intent classification + 768-dim query embedding
-        const [classification, queryVector] = await Promise.all([
-          geminiService.classifyQueryIntent(q, safeHistory, currentCategory),
-          geminiService.embedText(q),
-        ]);
+        // 1. 3-Way Intent Router (Fast-Path Regex + Gemini 3.5 Flash Lite)
+        const intent = await geminiService.classifyComprehensiveIntent(q, safeHistory, currentCategory);
 
+        // Branch 1: General Chat / Greeting / Persona Introduction
+        if (intent.intentType === 'general_chat') {
+          const casualRes = await geminiService.generateCasualResponse(q, safeHistory);
+          return reply.send({
+            success: true,
+            query: q,
+            intentType: 'general_chat',
+            detectedCategory: 'all',
+            categoryReason: intent.reason,
+            advice: casualRes.advice,
+            followUpQuestion: casualRes.followUpQuestion,
+            suggestedQueries: casualRes.suggestedQueries,
+            recommendedProducts: [],
+            verifiedReviews: [],
+          });
+        }
+
+        // Branch 2: Event Schedule Inquiry
+        if (intent.intentType === 'event_schedule') {
+          const eventRes = await eventAdvisorService.handleEventQuery(q, intent.eventFilters);
+          return reply.send({
+            success: true,
+            query: q,
+            intentType: 'event_schedule',
+            detectedCategory: 'all',
+            categoryReason: intent.reason,
+            advice: eventRes.advice,
+            followUpQuestion: eventRes.followUpQuestion,
+            suggestedQueries: eventRes.suggestedQueries,
+            recommendedProducts: [],
+            verifiedReviews: [],
+          });
+        }
+
+        // Branch 3: Gear Recommendation (pgvector RAG)
+        const queryVector = await geminiService.embedText(q);
         const vectorStr = `[${queryVector.join(',')}]`;
-        const targetCategory = classification.category;
+        const targetCategory = intent.category || 'all';
 
         // 2. In-Category Products Cosine Search
         let rawProducts = await prisma.$queryRawUnsafe<RawProductMatch[]>(
@@ -322,8 +356,9 @@ export async function aiRoutes(app: FastifyInstance) {
         return reply.send({
           success: true,
           query: q,
-          detectedCategory: classification.category,
-          categoryReason: classification.reason,
+          intentType: 'gear_recommend',
+          detectedCategory: targetCategory,
+          categoryReason: intent.reason,
           advice: chatRes.advice,
           followUpQuestion: chatRes.followUpQuestion,
           suggestedQueries: chatRes.suggestedQueries,
