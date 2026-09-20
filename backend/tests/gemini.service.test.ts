@@ -14,6 +14,8 @@ function cosineSimilarity(vecA: number[], vecB: number[]): number {
   return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
+const itWithKey = process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your-gemini-api-key-here' ? it : it.skip;
+
 describe('GeminiService', () => {
   jest.setTimeout(25000);
   let service: GeminiService;
@@ -37,7 +39,7 @@ describe('GeminiService', () => {
       // Normalized mock vector: sum of squares ≈ 1 or valid finite numbers
       expect(embedding.every((n: number) => Number.isFinite(n))).toBe(true);
     });
-    it('returns a real 768-dimensional embedding and reflects semantic similarity (Post 5 > Post 67)', async () => {
+    itWithKey('returns a real 768-dimensional embedding and reflects semantic similarity (Post 5 > Post 67)', async () => {
       const query = '발볼 넓은 러너 적합 신발 추천';
       const post5 = '발볼 10.5cm 러너의 슬레드 푸시용 와이드 핏 레이서 장비 실착기 - 발볼이 넓은 러너는 앞코 토박스가 2E 규격으로 여유로우면서 측면 토크를 지지하는 TPU 보강 프레임 신발을 신어야 발가락 쏠림이 없음.';
       const post67 = '로잉 댐퍼 레버 5.5 설정이 Concept2 최적의 드래그팩터인 이유 - 댐퍼 10은 무거운 물을 젓는 보트와 같아 요추 부상을 부르므로 드래그팩터 125~130(댐퍼 5~6) 세팅이 기록에 가장 유리.';

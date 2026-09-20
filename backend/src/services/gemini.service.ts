@@ -86,7 +86,8 @@ ${historyContext}
         };
       }
       return this.classifyMockIntent(query, currentCategory);
-    } catch {
+    } catch (err: any) {
+      console.warn('[GeminiService] classifyQueryIntent failed, falling back to mock:', err?.message || err);
       return this.classifyMockIntent(query, currentCategory);
     }
   }
@@ -195,7 +196,8 @@ JSON 출력 규격:
         };
       }
       return this.generateMockChatResponse(query, products, posts);
-    } catch {
+    } catch (err: any) {
+      console.warn('[GeminiService] generateChatResponse failed, falling back to mock:', err?.message || err);
       return this.generateMockChatResponse(query, products, posts);
     }
   }
@@ -253,7 +255,8 @@ JSON 출력 규격:
         return result.embedding.values;
       }
       return this.generateMockEmbedding(text);
-    } catch {
+    } catch (err: any) {
+      console.warn('[GeminiService] embedText failed, falling back to mock:', err?.message || err);
       return this.generateMockEmbedding(text);
     }
   }
@@ -299,7 +302,8 @@ ${postSummary}
       const res = await chatModel.generateContent(prompt);
       const text = res.response.text().trim();
       return text || this.generateMockAdvice(query, products, posts);
-    } catch {
+    } catch (err: any) {
+      console.warn('[GeminiService] generateRecommendationAdvice failed, falling back to mock:', err?.message || err);
       return this.generateMockAdvice(query, products, posts);
     }
   }
