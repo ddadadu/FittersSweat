@@ -10,6 +10,11 @@ export interface EventItem {
   id: string;
   name: string;
   cityCode: string;
+  city?: string | null;
+  country?: string | null;
+  continent?: string | null;
+  division?: string | null;
+  imageUrl?: string | null;
   startDate: string;
   endDate: string;
   eventUrl: string | null;
@@ -29,7 +34,15 @@ export default function EventCard({ event, isInterested = false, onToggleInteres
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
   const dDayText = diffDays > 0 ? `D-${diffDays}` : diffDays === 0 ? 'D-DAY' : '종료';
-  const cityLabel = event.cityCode === 'SEL' ? '서울 (Seoul)' : event.cityCode === 'ICN' ? '인천 송도 (Incheon)' : event.cityCode;
+  const cityLabel = event.city
+    ? event.country
+      ? `${event.city}, ${event.country}`
+      : event.city
+    : event.cityCode === 'SEL'
+    ? '서울 (Seoul)'
+    : event.cityCode === 'ICN'
+    ? '인천 송도 (Incheon)'
+    : event.cityCode;
 
   const handleInterestClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -48,9 +61,16 @@ export default function EventCard({ event, isInterested = false, onToggleInteres
     <div className="rounded-2xl bg-neutral-900 border border-neutral-800 p-6 flex flex-col justify-between hover:border-neutral-700 transition-all hover:shadow-xl hover:shadow-black/50 group">
       <div>
         <div className="flex items-center justify-between mb-4">
-          <span className="px-3 py-1 rounded-full text-xs font-black bg-[#FFD700] text-black">
-            {dDayText}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1 rounded-full text-xs font-black bg-[#FFD700] text-black">
+              {dDayText}
+            </span>
+            {event.division === 'Youngstars' && (
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
+                Youngstars
+              </span>
+            )}
+          </div>
           <button
             type="button"
             onClick={handleInterestClick}
@@ -72,11 +92,11 @@ export default function EventCard({ event, isInterested = false, onToggleInteres
 
         <div className="space-y-2 text-sm text-neutral-400 mb-6">
           <div className="flex items-center space-x-2">
-            <MapPin className="w-4 h-4 text-[#FFD700]" />
-            <span>{cityLabel}</span>
+            <MapPin className="w-4 h-4 text-[#FFD700] shrink-0" />
+            <span className="line-clamp-1">{cityLabel}</span>
           </div>
           <div className="flex items-center space-x-2">
-            <Calendar className="w-4 h-4 text-[#FFD700]" />
+            <Calendar className="w-4 h-4 text-[#FFD700] shrink-0" />
             <span>
               {new Date(event.startDate).toLocaleDateString('ko-KR')} ~{' '}
               {new Date(event.endDate).toLocaleDateString('ko-KR')}
