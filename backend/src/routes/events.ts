@@ -1,12 +1,35 @@
 import { FastifyInstance } from 'fastify';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 export async function eventRoutes(app: FastifyInstance) {
-  // 1. 대회 목록 조회
+  // 1. 대회 목록 조회 (다차원 필터링 지원)
   app.get('/', async (request, reply) => {
+    const query = request.query as {
+      continent?: string;
+      country?: string;
+      city?: string;
+      division?: string;
+    };
+
+    const where: Prisma.EventWhereInput = {};
+
+    if (query.continent && query.continent !== 'ALL') {
+      where.continent = query.continent;
+    }
+    if (query.country && query.country !== 'ALL') {
+      where.country = query.country;
+    }
+    if (query.city && query.city !== 'ALL') {
+      where.city = query.city;
+    }
+    if (query.division && query.division !== 'ALL') {
+      where.division = query.division;
+    }
+
     const events = await prisma.event.findMany({
+      where,
       orderBy: { startDate: 'asc' },
     });
 

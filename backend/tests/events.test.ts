@@ -71,6 +71,31 @@ describe('Events API & Scraper (/api/v1/events)', () => {
       eventId = body.events[0].id;
     });
 
+    it('GET /api/v1/events with multi-filter query params - should filter by continent and division', async () => {
+      const resContinent = await app.inject({
+        method: 'GET',
+        url: '/api/v1/events?continent=' + encodeURIComponent('아시아-태평양 (Asia-Pacific)'),
+      });
+      expect(resContinent.statusCode).toBe(200);
+      const bodyContinent = JSON.parse(resContinent.payload);
+      expect(bodyContinent.success).toBe(true);
+      expect(bodyContinent.events.length).toBeGreaterThan(0);
+      bodyContinent.events.forEach((e: any) => {
+        expect(e.continent).toBe('아시아-태평양 (Asia-Pacific)');
+      });
+
+      const resDivision = await app.inject({
+        method: 'GET',
+        url: '/api/v1/events?division=Youngstars',
+      });
+      expect(resDivision.statusCode).toBe(200);
+      const bodyDivision = JSON.parse(resDivision.payload);
+      expect(bodyDivision.success).toBe(true);
+      bodyDivision.events.forEach((e: any) => {
+        expect(e.division).toBe('Youngstars');
+      });
+    });
+
     it('GET /api/v1/events/:id - should return single event details', async () => {
       const response = await app.inject({
         method: 'GET',
