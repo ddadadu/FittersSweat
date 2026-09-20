@@ -12,7 +12,21 @@ export interface CategoryClassification {
   reason: string;
 }
 
+export type IntentType = 'gear_recommend' | 'event_schedule' | 'general_chat';
+
+export interface ComprehensiveIntent {
+  intentType: IntentType;
+  category?: 'nutrition' | 'shoes' | 'gear' | 'equipment' | 'all';
+  eventFilters?: {
+    country?: string;
+    continent?: string;
+    status?: 'upcoming' | 'past' | 'all';
+  };
+  reason: string;
+}
+
 export interface ChatAdvisorResponse {
+  intentType?: IntentType;
   advice: string;
   followUpQuestion: string;
   suggestedQueries: string[];
@@ -89,6 +103,133 @@ ${historyContext}
     } catch (err: any) {
       console.warn('[GeminiService] classifyQueryIntent failed, falling back to mock:', err?.message || err);
       return this.classifyMockIntent(query, currentCategory);
+    }
+  }
+
+  /**
+   * Hybrid 3-Way Intent Router: Fast-path regex (<1ms) with Gemini 3.5 Flash Lite fallback.
+   */
+  async classifyComprehensiveIntent(
+    query: string,
+    history?: Array<{ role: string; content: string }>,
+    currentCategory?: string
+  ): Promise<ComprehensiveIntent> {
+    const q = query.trim();
+
+    // 1. Fast-Path: Event schedule queries
+    if (/대회|일정|경기|스케줄|언제 열려|마라톤|개최|레이스 일정|참가 신청/i.test(q)) {
+      const isKorea = /대한민국|한국|서울|인천|국내|송도/i.test(q);
+      const isPast = /종료된|지난|과거|끝난/i.test(q);
+      return {
+        intentType: 'event_schedule',
+        eventFilters: {
+          country: isKorea ? '대한민국' : undefined,
+          status: isPast ? 'past' : 'upcoming',
+        },
+        reason: 'Fast-path event keyword match',
+      };
+    }
+
+    // 2. Fast-Path: Casual chat / Greeting / Persona questions
+    if (/^(안녕|반가워|하이|누구|역할|뭐해|도와줘|소개|반갑습니다|너는|피터|챗봇)/i.test(q) || /넌 어떤 역할을 수행해|너는 누구야|뭐하는 애야/i.test(q)) {
+      return {
+        intentType: 'general_chat',
+        reason: 'Fast-path general chat keyword match',
+      };
+    }
+
+    // 3. Fast-Path: Obvious gear keywords
+    if (/신발|러닝화|장비|보호대|니슬리브|에너지젤|젤|추천|사이즈|구매|기어|옷|양말/i.test(q)) {
+      const cat = await this.classifyQueryIntent(q, history, currentCategory);
+      return {
+        intentType: 'gear_recommend',
+        category: cat.category,
+        reason: `Fast-path gear match: ${cat.reason}`,
+      };
+    }
+
+    // 4. LLM Deep-Path fallback for ambiguous/complex queries
+    if (this.isMock || !this.genAI) {
+      return { intentType: 'gear_recommend', category: 'all', reason: 'mock fallback' };
+    }
+
+    try {
+      const model = this.genAI.getGenerativeModel({
+        model: 'gemini-3.5-flash-lite',
+        generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 200 },
+      });
+      const prompt = `사용자의 질문을 3가지 의도(intentType) 중 하나로 분류하세요:
+- "gear_recommend": 신발, 의류, 에너지젤, 보호대 등 장비/제품 추천 요청
+- "event_schedule": HYROX 대회 일정, 경기 날짜, 장소, 접수 일정 문의
+- "general_chat": 인사, 소개, 역할 질문, 일상 대화
+
+질문: "${q}"
+JSON 규격:
+{"intentType":"gear_recommend"|"event_schedule"|"general_chat","category":"shoes"|"nutrition"|"gear"|"equipment"|"all","country":"대한민국"|null,"status":"upcoming"|"past"|"all"}`;
+      const res = await model.generateContent(prompt);
+      const parsed = JSON.parse(res.response.text().trim());
+      return {
+        intentType: parsed.intentType || 'gear_recommend',
+        category: parsed.category || 'all',
+        eventFilters: parsed.intentType === 'event_schedule' ? { country: parsed.country || undefined, status: parsed.status || 'upcoming' } : undefined,
+        reason: 'LLM intent classification',
+      };
+    } catch {
+      return { intentType: 'gear_recommend', category: 'all', reason: 'LLM error fallback' };
+    }
+  }
+
+  /**
+   * Synthesizes a friendly, persona-driven greeting and role explanation.
+   */
+  async generateCasualResponse(
+    query: string,
+    history?: Array<{ role: string; content: string }>
+  ): Promise<ChatAdvisorResponse> {
+    const defaultResponse: ChatAdvisorResponse = {
+      intentType: 'general_chat',
+      advice: '안녕하세요! 저는 FitterSweat의 수석 기어 피터입니다. 🏋️‍♂️\n\nHYROX 8개 스테이션 완주를 위한 **최적의 직매입 기어 1:1 처방**, **국내외 대회 일정 안내**, 그리고 **실제 완주자들의 검증된 레이스 후기**를 신속하게 안내해 드립니다. 무엇을 도와드릴까요?',
+      followUpQuestion: '어떤 스테이션이나 장비, 또는 출전 예정인 대회에 대해 알아보고 싶으신가요?',
+      suggestedQueries: [
+        '발볼 넓은 러너를 위한 신발 추천해줘',
+        '현재 종료되지 않은 대한민국 대회 일정 알려줘',
+        '첫 출전인데 필수 장비 풀세트 알려줘',
+      ],
+    };
+
+    if (this.isMock || !this.genAI) {
+      return defaultResponse;
+    }
+
+    try {
+      const model = this.genAI.getGenerativeModel({
+        model: 'gemini-3.5-flash-lite',
+        generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 500 },
+      });
+      const prompt = `당신은 HYROX 전문 수석 기어 피터(Chief Gear Fitter)입니다. 사용자의 인사나 역할 질문에 대해 친절하고 전문적인 어조로 답변을 작성하세요.
+답변에는 FitterSweat에서 제공하는 3대 서비스(8개 스테이션 맞춤 직매입 기어 처방, 국내외 HYROX 대회 일정 안내, 완주자 검증 후기 매칭)가 자연스럽게 포함되어야 합니다.
+
+사용자 질문: "${query}"
+
+JSON 출력 규격:
+{
+  "advice": "500자 이내 친절하고 전문적인 마크다운 소개/인사",
+  "followUpQuestion": "레이서의 관심사를 묻는 1문장의 후속 질문",
+  "suggestedQueries": ["추천 칩 1", "추천 칩 2", "추천 칩 3"]
+}`;
+      const res = await model.generateContent(prompt);
+      const parsed = JSON.parse(res.response.text().trim());
+      if (parsed.advice && parsed.followUpQuestion && Array.isArray(parsed.suggestedQueries)) {
+        return {
+          intentType: 'general_chat',
+          advice: parsed.advice.slice(0, 500),
+          followUpQuestion: parsed.followUpQuestion,
+          suggestedQueries: parsed.suggestedQueries.slice(0, 4),
+        };
+      }
+      return defaultResponse;
+    } catch {
+      return defaultResponse;
     }
   }
 

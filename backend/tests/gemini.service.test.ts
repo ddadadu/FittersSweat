@@ -150,5 +150,28 @@ describe('GeminiService', () => {
       expect(res.suggestedQueries.length).toBeLessThanOrEqual(4);
     });
   });
+
+  describe('classifyComprehensiveIntent (Hybrid 3-Way Router)', () => {
+    it('fast-paths greeting and persona queries to general_chat in <10ms', async () => {
+      const start = Date.now();
+      const res = await service.classifyComprehensiveIntent('안녕 챗봇 피터 넌 어떤 역할을 수행해?');
+      const elapsed = Date.now() - start;
+      expect(res.intentType).toBe('general_chat');
+      expect(elapsed).toBeLessThan(100);
+    });
+
+    it('fast-paths event schedule query to event_schedule with parsed filters', async () => {
+      const res = await service.classifyComprehensiveIntent('현재 종료되지 않은 대한민국 대회 일정 알려줘');
+      expect(res.intentType).toBe('event_schedule');
+      expect(res.eventFilters?.country).toContain('대한민국');
+      expect(res.eventFilters?.status).toBe('upcoming');
+    });
+
+    it('classifies gear request as gear_recommend with target category', async () => {
+      const res = await service.classifyComprehensiveIntent('발볼 넓은 러너를 위한 신발 추천해줘');
+      expect(res.intentType).toBe('gear_recommend');
+      expect(res.category).toBe('shoes');
+    });
+  });
 });
 
