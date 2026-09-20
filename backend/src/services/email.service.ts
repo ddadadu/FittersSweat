@@ -8,40 +8,33 @@ export interface SendEmailParams {
 export class EmailService {
   private static transporter: nodemailer.Transporter | null = null;
 
-  private static getTransporter(): nodemailer.Transporter {
-    if (!this.transporter) {
-      const port = Number(process.env.SMTP_PORT) || 587;
-      this.transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST || 'smtp.gmail.com',
-        port,
-        secure: port === 465,
-        auth: {
-          user: process.env.SMTP_USER || '',
-          pass: process.env.SMTP_PASS ? process.env.SMTP_PASS.replace(/\s+/g, '') : '',
-        },
-        pool: true,
-        maxConnections: 5,
-        maxMessages: 100,
-      });
-    }
-    return this.transporter;
+  private static getTransporter(portOverride?: number): nodemailer.Transporter {
+    const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+    const port = portOverride || Number(process.env.SMTP_PORT) || (host.includes('gmail') ? 465 : 587);
+    const isSecure = port === 465;
+
+    return nodemailer.createTransport({
+      host,
+      port,
+      secure: isSecure,
+      auth: {
+        user: process.env.SMTP_USER || '',
+        pass: process.env.SMTP_PASS ? process.env.SMTP_PASS.replace(/\s+/g, '') : '',
+      },
+      connectionTimeout: 5000,
+      greetingTimeout: 5000,
+      socketTimeout: 8000,
+      pool: true,
+      maxConnections: 5,
+      maxMessages: 100,
+    });
   }
 
   /**
    * Sends 6-digit OTP verification email
    */
   static async sendVerificationEmail({ to, code }: SendEmailParams): Promise<boolean> {
-    // Fallback for test or missing credentials (Ponytail zero-blocker)
-    if (process.env.NODE_ENV === 'test' || !process.env.SMTP_PASS) {
-      console.log(`\n📧 [DEV/TEST MOCK EMAIL] To: ${to} | Verification Code: [ ${code} ] (Valid for 5 mins)\n`);
-      return true;
-    }
-
-    const mailOptions = {
-      from: `"FitterSweat" <${process.env.SMTP_USER || 'noreply@fittersweat.com'}>`,
-      to,
-      subject: '[FitterSweat] 회원가입 이메일 인증번호 안내',
-      html: `
+    const htmlContent = `
         <div style="background-color: #0A0A0A; padding: 40px 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #FFFFFF;">
           <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 480px; background-color: #141414; border: 1px solid #262626; border-radius: 16px; padding: 32px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
             <tr>
@@ -72,15 +65,66 @@ export class EmailService {
             </tr>
           </table>
         </div>
-      `,
+      `;
+
+    // 1순위: Resend HTTPS REST API (Port 443 - Railway 방화벽에 영향받지 않는 클라우드 표준)
+    // ponytail: node 18+ global fetch 사용, 무거운 외부 SDK 없이 의존성 제로로 구현
+    if (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.trim() !== '') {
+      try {
+        const fromEmail = process.env.RESEND_FROM || 'FitterSweat <onboarding@resend.dev>';
+        const response = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.RESEND_API_KEY.trim()}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: fromEmail,
+            to: [to],
+            subject: '[FitterSweat] 회원가입 이메일 인증번호 안내',
+            html: htmlContent,
+          }),
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (response.ok) {
+          console.log(`✅ [RESEND SUCCESS] Verification email sent to ${to} (ID: ${(data as any).id || 'ok'})`);
+          return true;
+        } else {
+          console.warn(`⚠️ [RESEND FAILED] Status ${response.status}:`, data);
+        }
+      } catch (resendErr: any) {
+        console.warn(`⚠️ [RESEND EXCEPTION]: ${resendErr.message}. Trying SMTP fallback...`);
+      }
+    }
+
+    // Fallback for test or missing credentials (Ponytail zero-blocker)
+    if (process.env.NODE_ENV === 'test' || !process.env.SMTP_PASS) {
+      console.log(`\n📧 [DEV/TEST MOCK EMAIL] To: ${to} | Verification Code: [ ${code} ] (Valid for 5 mins)\n`);
+      return true;
+    }
+
+    const mailOptions = {
+      from: `"FitterSweat" <${process.env.SMTP_USER || 'noreply@fittersweat.com'}>`,
+      to,
+      subject: '[FitterSweat] 회원가입 이메일 인증번호 안내',
+      html: htmlContent,
     };
 
     try {
-      await this.getTransporter().sendMail(mailOptions);
+      // 1차 시도: 포트 465 (SSL)
+      await this.getTransporter(465).sendMail(mailOptions);
       return true;
-    } catch (err: any) {
-      console.error('Email send failed via Nodemailer:', err);
-      throw new Error(`이메일 발송에 실패했습니다: ${err.message || 'SMTP 통신 오류'}`);
+    } catch (err465: any) {
+      console.warn('SMTP Port 465 failed, trying Port 587 fallback:', err465.message);
+      try {
+        // 2차 시도: 포트 587 (STARTTLS)
+        await this.getTransporter(587).sendMail(mailOptions);
+        return true;
+      } catch (err587: any) {
+        console.error('Email send failed via both Port 465 and 587:', err587);
+        throw new Error(`이메일 발송에 실패했습니다: ${err587.message || err465.message || 'SMTP 통신 오류'}`);
+      }
     }
   }
 }

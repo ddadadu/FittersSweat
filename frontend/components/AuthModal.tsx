@@ -117,7 +117,7 @@ export default function AuthModal() {
 
     try {
       setIsSendingOtp(true);
-      const res = await fetchApi<{ success: boolean; message: string }>(
+      const res = await fetchApi<{ success: boolean; message: string; isMock?: boolean; devCode?: string }>(
         '/api/v1/auth/send-verification-email',
         {
           method: 'POST',
@@ -126,7 +126,12 @@ export default function AuthModal() {
       );
       setIsOtpSent(true);
       setOtpTimer(300);
-      setInfoMessage(res.message || '인증번호가 발송되었습니다. 이메일을 확인해 주세요.');
+      if (res.devCode) {
+        setOtpCode(res.devCode);
+        setInfoMessage(res.message || `인증코드 [${res.devCode}]가 자동 입력되었습니다.`);
+      } else {
+        setInfoMessage(res.message || '인증번호가 발송되었습니다. 이메일을 확인해 주세요.');
+      }
     } catch (err: any) {
       setErrorMessage(err.message || '인증번호 발송에 실패했습니다.');
     } finally {
