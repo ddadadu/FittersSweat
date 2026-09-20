@@ -27,6 +27,7 @@ export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  intentType?: 'gear_recommend' | 'event_schedule' | 'general_chat';
   detectedCategory?: string;
   categoryReason?: string;
   products?: RecommendedProduct[];
@@ -193,6 +194,7 @@ export const useAiChatStore = create<AiChatState>()(
             id: `assistant-${Date.now()}`,
             role: 'assistant',
             content: data.advice,
+            intentType: data.intentType,
             detectedCategory: data.detectedCategory,
             categoryReason: data.categoryReason,
             products: data.recommendedProducts || [],

@@ -1,11 +1,72 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { Bot, User, Sparkles, HelpCircle } from 'lucide-react';
 import { ChatMessage } from '@/stores/useAiChatStore';
 import { MiniProductCard } from './MiniProductCard';
 import { ReviewAccordion } from './ReviewAccordion';
 import { RecursiveQueryPills } from './RecursiveQueryPills';
+
+/**
+ * Lightweight inline markdown renderer for chat bubbles.
+ * Parses [text](url) into Next.js Links / external links, and **text** into bold tags.
+ * Ponytail: Zero external dependencies, pure native string manipulation & regex.
+ */
+function renderFormattedContent(content: string) {
+  if (!content) return null;
+
+  // Split by markdown link [label](url) or bold **text**
+  const tokens = content.split(/(\[[^\]]+\]\([^)]+\)|\*\*[^*]+\*\*)/g);
+
+  return tokens.map((part, index) => {
+    if (!part) return null;
+
+    // Check for markdown link [label](url)
+    const linkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+    if (linkMatch) {
+      const [, label, href] = linkMatch;
+      const isInternal = href.startsWith('/') || href.startsWith('#');
+
+      if (isInternal) {
+        return (
+          <Link
+            key={`link-${index}`}
+            href={href}
+            className="inline-flex items-center gap-1 text-[#FFD700] hover:text-[#FFE44D] font-semibold underline underline-offset-4 cursor-pointer transition-colors duration-200"
+          >
+            {label} ➔
+          </Link>
+        );
+      }
+
+      return (
+        <a
+          key={`ext-link-${index}`}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-[#FFD700] hover:text-[#FFE44D] font-semibold underline underline-offset-4 cursor-pointer transition-colors duration-200"
+        >
+          {label} ➔
+        </a>
+      );
+    }
+
+    // Check for bold **text**
+    const boldMatch = part.match(/^\*\*([^*]+)\*\*$/);
+    if (boldMatch) {
+      return (
+        <strong key={`bold-${index}`} className="font-bold text-white">
+          {boldMatch[1]}
+        </strong>
+      );
+    }
+
+    // Regular plain text
+    return <React.Fragment key={`text-${index}`}>{part}</React.Fragment>;
+  });
+}
 
 interface ChatMessageBubbleProps {
   message: ChatMessage;
@@ -42,6 +103,8 @@ export function ChatMessageBubble({
     gear: '보호 기어 & 테이핑',
     equipment: '훈련 장비',
     all: '종합 레이스 처방',
+    events: '대회 일정 & 레이스',
+    general: '피터 일상 & 코칭',
   };
 
   const categoryLabel = message.detectedCategory
@@ -87,7 +150,7 @@ export function ChatMessageBubble({
 
         {/* 2. Middle: Advisor Advice Text (max 500 chars) */}
         <div className="text-xs sm:text-sm text-neutral-200 leading-relaxed font-normal whitespace-pre-line break-keep">
-          {message.content}
+          {renderFormattedContent(message.content)}
         </div>
 
         {/* 3. Lower: Racer Verified Reviews (Accordion Badge) */}
