@@ -61,10 +61,10 @@ export class EventAdvisorService {
       const dateStr = `${start.getFullYear()}.${String(start.getMonth() + 1).padStart(2, '0')}.${String(start.getDate()).padStart(2, '0')}`;
       const diffDays = Math.ceil((start.getTime() - now) / (1000 * 60 * 60 * 24));
       const dDayText = diffDays > 0 ? `D-${diffDays}` : diffDays === 0 ? 'D-Day' : '종료';
-      return `${idx + 1}. [${ev.name}](/events/${ev.id}) (${dDayText}, ${dateStr} / ${ev.city})`;
+      return `${idx + 1}. [${ev.name}](/events/${ev.id}) (${dDayText}, ${dateStr} / ${ev.city}) [상세](/events/${ev.id})`;
     });
 
-    const fallbackAdvice = `현재 확인되는 주요 대회 일정입니다:\n\n${eventSummaries.join('\n')}\n\n목표하시는 대회를 클릭하시면 상세 일정과 장소 정보를 확인하실 수 있습니다. 출전을 원하시는 대회의 코스나 준비 장비에 대해 언제든 물어보세요!`;
+    const fallbackAdvice = `현재 확인되는 주요 대회 일정입니다:\n\n${eventSummaries.join('\n')}\n\n[상세] 버튼을 누르시면 각 대회의 상세 일정과 장소 정보를 확인하실 수 있습니다. 출전을 원하시는 대회의 코스나 준비 장비에 대해 언제든 물어보세요!`;
 
     // Attempt Gemini synthesis for conversational polish
     try {
@@ -87,7 +87,9 @@ export class EventAdvisorService {
       });
 
       const prompt = `당신은 HYROX 전문 수석 기어 피터입니다. 사용자 질문과 조회된 공식 대회 목록을 기반으로 친절하고 명확한 대회 안내를 작성하세요.
-각 대회명은 반드시 제공된 [대회명](/events/대회ID) 마크다운 링크 형식을 그대로 유지해야 합니다. 대회ID를 임의로 누락하거나 /events로 축약하지 마세요. 대괄호와 소괄호 사이에 공백을 두지 마세요.
+각 대회 항목은 반드시 [대회명](/events/대회ID) 마크다운 링크와 함께 [상세](/events/대회ID) 토글 링크를 그대로 포함해야 합니다.
+예시: 1. [AirAsia 하이록스 서울](/events/35) (D-53, 2026.11.12 / 서울) [상세](/events/35)
+대회ID를 임의로 누락하거나 /events로 축약하지 마세요. 대괄호와 소괄호 사이에 공백을 두지 마세요.
 
 [사용자 질문]: "${query}"
 [조회된 대회]:
@@ -95,7 +97,7 @@ ${eventSummaries.join('\n')}
 
 JSON 출력 규격:
 {
-  "advice": "500자 이내 마크다운 대회 안내 텍스트. 제공된 [대회명](/events/대회ID) 링크 필수 포함",
+  "advice": "500자 이내 마크다운 대회 안내 텍스트. 각 대회마다 [대회명](/events/대회ID) 및 [상세](/events/대회ID) 필수 포함",
   "followUpQuestion": "출전 준비 또는 장비 필요성을 묻는 1문장의 후속 질문",
   "suggestedQueries": ["추천 칩 1", "추천 칩 2", "추천 칩 3"]
 }`;

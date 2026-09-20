@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Bot, User, Sparkles, HelpCircle } from 'lucide-react';
+import { Bot, User, Sparkles, HelpCircle, ArrowRight } from 'lucide-react';
 import { ChatMessage, useAiChatStore } from '@/stores/useAiChatStore';
 import { MiniProductCard } from './MiniProductCard';
 import { ReviewAccordion } from './ReviewAccordion';
@@ -11,9 +11,6 @@ import { RecursiveQueryPills } from './RecursiveQueryPills';
 function renderLink(label: string, href: string, key: string, isBold = false) {
   const cleanLabel = label.replace(/\*\*/g, '').trim();
   const isInternal = href.startsWith('/') || href.startsWith('#');
-  const className = `inline-flex items-center gap-1 text-[#FFD700] hover:text-[#FFE44D] ${
-    isBold ? 'font-bold' : 'font-semibold'
-  } underline underline-offset-4 cursor-pointer transition-colors duration-200`;
 
   const handleClick = () => {
     if (typeof window !== 'undefined' && window.innerWidth < 1024) {
@@ -21,10 +18,50 @@ function renderLink(label: string, href: string, key: string, isBold = false) {
     }
   };
 
+  const isDetailButton =
+    cleanLabel === '상세' ||
+    cleanLabel === '상세보기' ||
+    cleanLabel === '대회 상세' ||
+    cleanLabel === '상세 보기';
+
+  if (isDetailButton) {
+    if (isInternal) {
+      return (
+        <Link
+          key={key}
+          href={href}
+          onClick={handleClick}
+          className="inline-flex items-center gap-1 mx-1 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-[#FFD700] text-black hover:bg-[#FFE44D] active:scale-95 transition-all shadow-md shadow-[#FFD700]/25 cursor-pointer align-middle"
+          title="해당 대회 상세 정보 보기"
+        >
+          <span>상세</span>
+          <ArrowRight className="w-3 h-3 text-black stroke-[3]" />
+        </Link>
+      );
+    }
+    return (
+      <a
+        key={key}
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1 mx-1 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-[#FFD700] text-black hover:bg-[#FFE44D] active:scale-95 transition-all shadow-md shadow-[#FFD700]/25 cursor-pointer align-middle"
+        title="대회 상세 정보 보기"
+      >
+        <span>상세</span>
+        <ArrowRight className="w-3 h-3 text-black stroke-[3]" />
+      </a>
+    );
+  }
+
+  const className = `inline-flex items-center gap-1 text-[#FFD700] hover:text-[#FFE44D] ${
+    isBold ? 'font-bold' : 'font-semibold'
+  } underline underline-offset-4 cursor-pointer transition-colors duration-200`;
+
   if (isInternal) {
     return (
       <Link key={key} href={href} onClick={handleClick} className={className}>
-        {cleanLabel} ➔
+        {cleanLabel}
       </Link>
     );
   }
@@ -37,7 +74,7 @@ function renderLink(label: string, href: string, key: string, isBold = false) {
       rel="noopener noreferrer"
       className={className}
     >
-      {cleanLabel} ➔
+      {cleanLabel}
     </a>
   );
 }
@@ -140,8 +177,9 @@ export function ChatMessageBubble({
     general: '피터 일상 & 코칭',
   };
 
-  const categoryLabel = message.detectedCategory
-    ? categoryLabelMap[message.detectedCategory] || message.detectedCategory.toUpperCase()
+  const catKey = (message.detectedCategory || '').toLowerCase().trim();
+  const categoryLabel = catKey
+    ? categoryLabelMap[catKey] || message.detectedCategory?.toUpperCase()
     : null;
 
   return (
