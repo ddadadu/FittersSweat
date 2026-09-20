@@ -1,3 +1,5 @@
+import dotenv from 'dotenv';
+dotenv.config();
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export interface GeminiServiceOptions {
@@ -43,7 +45,7 @@ export class GeminiService {
 
     try {
       const model = this.genAI.getGenerativeModel({
-        model: 'gemini-1.5-flash',
+        model: 'gemini-3.6-flash',
         generationConfig: {
           responseMimeType: 'application/json',
           maxOutputTokens: 200,
@@ -148,7 +150,7 @@ ${historyContext}
 
     try {
       const chatModel = this.genAI.getGenerativeModel({
-        model: 'gemini-1.5-flash',
+        model: 'gemini-3.6-flash',
         generationConfig: {
           responseMimeType: 'application/json',
           maxOutputTokens: 500,
@@ -230,7 +232,7 @@ JSON 출력 규격:
   }
 
   /**
-   * Generates a 768-dimensional text embedding using text-embedding-004.
+   * Generates a 768-dimensional text embedding using gemini-embedding-001.
    * Falls back to deterministic mock vector if API key is not configured.
    */
   async embedText(text: string): Promise<number[]> {
@@ -239,8 +241,14 @@ JSON 출력 규격:
     }
 
     try {
-      const model = this.genAI.getGenerativeModel({ model: 'text-embedding-004' });
-      const result = await model.embedContent(text);
+      const model = this.genAI.getGenerativeModel({
+        model: 'gemini-embedding-001',
+      });
+      // @google/generative-ai embedContent supports { content: { parts: [{ text }] }, outputDimensionality: 768 }
+      const result = await model.embedContent({
+        content: { parts: [{ text }] },
+        outputDimensionality: 768,
+      } as any);
       if (result.embedding?.values && result.embedding.values.length === 768) {
         return result.embedding.values;
       }
@@ -251,7 +259,7 @@ JSON 출력 규격:
   }
 
   /**
-   * Generates personalized advisor recommendation advice using gemini-1.5-flash.
+   * Generates personalized advisor recommendation advice using gemini-3.6-flash.
    */
   async generateRecommendationAdvice(
     query: string,
@@ -272,7 +280,7 @@ JSON 출력 규격:
     }
 
     try {
-      const chatModel = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const chatModel = this.genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
       const prompt = `당신은 세계적인 피트니스 레이스 HYROX 전문 수석 기어 피터(Chief Gear Fitter)입니다.
 사용자의 질문과 실제 레이서들의 검증된 완주 후기, 직매입 장비 스펙을 바탕으로 2~3문장의 명확하고 자신감 넘치는 맞춤 처방을 한국어로 작성해주세요.
 
